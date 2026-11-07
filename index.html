@@ -497,12 +497,19 @@ go(location.hash.slice(1)||'overview',true);
 }
 
 /*CONV*/
+// A date may arrive as 'yyyy-MM-dd' or as an ISO timestamp of local midnight (e.g. 08:00Z = midnight in a zone west of UTC, 22:00Z = midnight east of it).
+function ymd(v){
+  const t=String(v), iso=t.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})/);
+  if(!iso) return t.split('-').map(Number);
+  const u=new Date(Date.UTC(+iso[1],+iso[2]-1,+iso[3]+(+iso[4]>=12?1:0)));
+  return [u.getUTCFullYear(),u.getUTCMonth()+1,u.getUTCDate()];
+}
 function toData(j){
   const num=v=>v===''||v==null?null:+v, live=s=>String(s).trim()!=='Template';
   const days=[], byM={};
   j.daily.forEach(([date,total,visa,cash,insta,guests,status])=>{
     total=num(total); if(total==null||!live(status)) return;
-    const [y,m,d]=String(date).split('-').map(Number); if(!y||!m||!d) return;
+    const [y,m,d]=ymd(date); if(!y||!m||!d) return;
     const wd=new Date(Date.UTC(y,m-1,d)).getUTCDay()||7;            // Mon=1 ... Sun=7
     days.push([y,m,d,wd,total,num(guests)||0]);
     const a=byM[y*100+m]=byM[y*100+m]||{y,m,n:0,total:0,guests:0,visa:null,cash:null,insta:null};
