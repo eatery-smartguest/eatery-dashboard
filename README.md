@@ -8,4 +8,5 @@ through a small Apps Script web app, using a password that only you know.
 - Months missing from `Monthly_Data` are rebuilt from the daily rows. The month in progress is marked "so far".
 
 Edit `WEBAPP_URL` (the `URL_` constant near the bottom of `index.html`) only if the Apps Script is deployed again as a new web app.
-Test: `node tests/conv.test.js`.
+Targets: add a `Targets` tab to the sheet with `Year, MonthNumber, Target_EGP` (the Apps Script must return it, see below).
+Tests: `node tests/conv.test.js` and `node tests/logic.test.js`.

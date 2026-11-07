@@ -121,6 +121,13 @@ input[type=date]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .gbox button{font:600 13px var(--f-body);color:#fff;background:var(--accent);border:0;border-radius:99px;padding:10px 18px;cursor:pointer}
 .gbox input:focus-visible,.gbox button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .sr{position:absolute;left:-9999px}
+.hbtn{font:500 12px var(--f-body);color:var(--ink);background:var(--glass-2);border:1px solid var(--edge);border-radius:99px;padding:7px 12px;cursor:pointer}
+.hbtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+@media print{
+  :root{--bg:#fff;--ink:#141414;--muted:#555;--glass:#fff;--glass-2:#f3f3f3;--edge:#ccc}
+  body::before,aside,.hd,#tip,.gate{display:none!important}
+  .app{display:block}.card{break-inside:avoid;box-shadow:none!important;backdrop-filter:none!important;border:1px solid #ccc}
+}
 </style>
 
 <div class="app">
@@ -132,7 +139,7 @@ input[type=date]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
   <main>
     <header>
       <div><small id="date"></small><h1 id="title">Overview</h1></div>
-      <div class="hd"><label for="month" class="pill">Month</label><select id="month"></select></div>
+      <div class="hd"><label for="month" class="pill">Month</label><select id="month"></select><button id="copy" type="button" class="hbtn">Copy summary</button><button id="print" type="button" class="hbtn">Print / PDF</button></div>
     </header>
     <div id="view" class="grid"></div>
   </main>
@@ -162,6 +169,7 @@ const lbl = r => MN[r.m-1]+' '+r.y+(r.part?' so far':'');
 const itemised = r => r.visa+r.cash+(r.insta||0);
 const gapOf = r => Math.max(0, r.total-itemised(r));
 const mLabels = months.map(r=>r.m===1?String(r.y):'');
+const targets = DATA.targets||{};
 let sel = months.map(r=>!r.part).lastIndexOf(true); if(sel<0) sel=months.length-1;   // default to the last complete month
 
 /* ---------- pieces ---------- */
@@ -316,6 +324,79 @@ function insights(months,days,sel){
   return out;
 }
 /*/INS*/
+/*LOGIC*/
+const L_dim=(y,m)=>new Date(Date.UTC(y,m,0)).getUTCDate();
+const L_wd=(y,m,d)=>new Date(Date.UTC(y,m-1,d)).getUTCDay()||7;
+const L_mean=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:0;
+const L_sum=(a,k)=>a.reduce((s,x)=>s+x[k],0);
+const L_add=(k,n)=>{const d=new Date(Date.UTC(Math.floor(k/10000),Math.floor(k/100)%100-1,k%100+n));return d.getUTCFullYear()*10000+(d.getUTCMonth()+1)*100+d.getUTCDate()};
+const L_key=x=>x.y*10000+x.m*100+x.d;
+const dayLbl=x=>WK[wkIdx(x.wd)]+' '+x.d+' '+MN[x.m-1];
+
+/* things worth a look: the latest day against its usual weekday, the last 7 days, and the cash share */
+function alerts(months,days){
+  const out=[], n=days.length; if(n<8) return out;
+  const L=days[n-1], same=days.slice(0,n-1).filter(x=>x.wd===L.wd).slice(-8), W=WK[wkIdx(L.wd)], P=v=>Math.abs(v*100).toFixed(0)+'%';
+  if(same.length>=3){
+    const aT=L_mean(same.map(x=>x.total)), aG=L_mean(same.map(x=>x.guests)), withG=same.filter(x=>x.guests>0), aC=L_mean(withG.map(x=>x.total/x.guests));
+    const dT=L.total/aT-1, dG=aG?L.guests/aG-1:0, dC=L.guests>0&&aC?(L.total/L.guests)/aC-1:0;
+    if(dT<=-.3) out.push(['bad',`${dayLbl(L)} sales were ${P(dT)} below a usual ${W}`,`${f(L.total)} EGP, against an average of ${f(aT)} over the last ${same.length} ${W}s.`]);
+    else if(dT>=.3) out.push(['good',`${dayLbl(L)} sales were ${P(dT)} above a usual ${W}`,`${f(L.total)} EGP, against an average of ${f(aT)} over the last ${same.length} ${W}s.`]);
+    if(dG<=-.2) out.push(['warn',`${dayLbl(L)} had ${P(dG)} fewer guests than a usual ${W}`,`${f(L.guests)} guests, against an average of ${f(aG)}.`]);
+    if(dC<=-.15) out.push(['warn',`Average check on ${dayLbl(L)} was ${P(dC)} lower than usual`,`${f(L.total/L.guests)} EGP, against an average of ${f(aC)}.`]);
+  }
+  if(n>=14){
+    const a=days.slice(-7), b=days.slice(-14,-7), dT=L_sum(a,'total')/L_sum(b,'total')-1, dG=L_sum(a,'guests')/L_sum(b,'guests')-1;
+    if(dT<=-.15) out.push(['bad',`Last 7 days sales are down ${P(dT)}`,`${short(L_sum(a,'total'))} against ${short(L_sum(b,'total'))} EGP in the 7 days before.`]);
+    else if(dT>=.15) out.push(['good',`Last 7 days sales are up ${P(dT)}`,`${short(L_sum(a,'total'))} against ${short(L_sum(b,'total'))} EGP in the 7 days before.`]);
+    if(dG<=-.15) out.push(['warn',`Last 7 days guests are down ${P(dG)}`,`${f(L_sum(a,'guests'))} against ${f(L_sum(b,'guests'))} in the 7 days before.`]);
+  }
+  const done=months.filter(r=>!r.part);
+  if(done.length>=4){const M=done[done.length-1], a=pct(M.cash,M.total), b=L_mean(done.slice(-4,-1).map(r=>pct(r.cash,r.total)));
+    if(a-b>=5) out.push(['warn',`Cash share is up to ${a.toFixed(1)}%`,`${(a-b).toFixed(1)} points above the average of the 3 months before (${b.toFixed(1)}%).`]);}
+  if(!out.length) out.push(['good','Nothing unusual',`${dayLbl(L)} and the last 7 days are in the normal range.`]);
+  return out;
+}
+
+/* newest month: forecast and target progress while it is still running, target result once it is over */
+function outlook(months,days,targets){
+  const R=months[months.length-1]; if(!R) return null;
+  const dim=L_dim(R.y,R.m), ds=days.filter(x=>x.y===R.y&&x.m===R.m), done=ds.length, tg=targets[R.y*100+R.m]||null, label=MN[R.m-1]+' '+R.y;
+  if(done>=dim) return tg?{kind:'done',label,total:R.total,target:tg,pct:R.total/tg*100}:null;
+  const lastD=ds[ds.length-1].d, recent=days.slice(-56), by={};
+  recent.forEach(x=>(by[x.wd]=by[x.wd]||[]).push(x.total));
+  const all=L_mean(recent.map(x=>x.total));
+  let rest=0; for(let d=lastD+1;d<=dim;d++){const w=by[L_wd(R.y,R.m,d)]; rest+=w?L_mean(w):all}
+  const so=L_sum(ds,'total'), left=dim-lastD, fc=so+rest, ya=months[idxOf[key(R.y-1,R.m)]];
+  return {kind:'open',label,done,dim,left,soFar:so,forecast:fc,target:tg,pctTarget:tg?so/tg*100:null,need:tg?Math.max(0,(tg-so)/left):null,
+    avgSoFar:so/done,yoy:ya&&!ya.part?(fc/ya.total-1)*100:null,hit:tg?fc>=tg:null};
+}
+
+/* best and worst days, weekdays, season, Ramadan */
+const RAMADAN=[[2024,20240311,20240409],[2025,20250301,20250329],[2026,20260218,20260319]];   // approximate start and end of the fast
+function patterns(months,days){
+  const real=days.filter(x=>x.total>0&&x.guests>0), sorted=[...real].sort((a,b)=>b.total-a.total);
+  const wdStat=ds=>{const by={};ds.forEach(x=>(by[x.wd]=by[x.wd]||[]).push(x));
+    return [6,7,1,2,3,4,5].filter(w=>by[w]).map(w=>({wd:w,t:L_mean(by[w].map(x=>x.total)),g:L_mean(by[w].map(x=>x.guests)),n:by[w].length}))};
+  // season: sales per day of each complete month, as an index of that year's average (100 = average month of the year)
+  const done=months.filter(r=>!r.part), yAvg={};
+  [...new Set(done.map(r=>r.y))].forEach(y=>{yAvg[y]=L_mean(done.filter(r=>r.y===y).map(r=>r.total/L_dim(r.y,r.m)))});
+  const season=MN.map((_,i)=>{const v=done.filter(r=>r.m===i+1).map(r=>r.total/L_dim(r.y,r.m)/yAvg[r.y]*100); return v.length?{m:i+1,idx:L_mean(v),n:v.length}:null}).filter(Boolean);
+  const ram=[]; RAMADAN.forEach(([y,s,e])=>{
+    const inn=days.filter(x=>L_key(x)>=s&&L_key(x)<=e), bef=days.filter(x=>L_key(x)>=L_add(s,-30)&&L_key(x)<s);
+    if(inn.length>=20&&bef.length>=20) ram.push({y,t:L_mean(inn.map(x=>x.total)),tb:L_mean(bef.map(x=>x.total)),g:L_mean(inn.map(x=>x.guests)),gb:L_mean(bef.map(x=>x.guests))});});
+  return {top:sorted.slice(0,5),bottom:sorted.slice(-5).reverse(),wdAll:wdStat(real),wdYear:wdStat(real.slice(-365)),season,ram};
+}
+
+/* plain text for WhatsApp */
+function summary(months,days,sel,out,al){
+  const M=months[sel], L=[`Eatery, ${lbl(M)}`,`Sales ${f(M.total)} EGP`,`Guests ${f(M.guests)}`,`Average check ${f(M.total/M.guests)} EGP`];
+  insights(months,days,sel).slice(0,4).forEach(([,,h,x])=>L.push(`- ${h}. ${x}`));
+  if(out&&out.kind==='open') L.push(`${out.label}: ${f(out.soFar)} EGP after ${out.done} days, forecast ${f(out.forecast)} EGP`+(out.target?`, target ${f(out.target)} EGP`:''));
+  al.forEach(([t,h])=>L.push((t==='bad'?'[!] ':t==='warn'?'[?] ':'[+] ')+h));
+  return L.join('\n');
+}
+/*/LOGIC*/
 const pages = {
  overview:{title:'Overview', html(){
   const M=months[sel], P=months[sel-1], ds=daysOf(M.y,M.m), best=ds.reduce((a,b)=>b.total>a.total?b:a), worst=ds.reduce((a,b)=>b.total<a.total?b:a);
@@ -331,6 +412,16 @@ const pages = {
   ${kpi('Average check',f(ch)+' EGP',delta(ch,P&&P.total/P.guests),`data-count="${Math.round(ch)}" data-suf=" EGP"`)}
   ${kpi('Best day',short(best.total),`<span class="sub">${dayName(best)}, ${best.guests} guests</span>`)}
   ${(()=>{const c={good:'var(--good)',bad:'var(--bad)',warn:'var(--warn)',info:'var(--muted)'};return `<div class="card glass s12"><h2>Key insights</h2><div class="sub">${lbl(M)}, worked out from your data</div><div class="insg">${insights(months,days,sel).map(([t,l,h,x])=>`<div class="ins" style="border-left-color:${c[t]}"><small>${l}</small><b>${h}</b><p>${x}</p></div>`).join('')}</div></div>`})()}
+  ${(()=>{const c={good:'var(--good)',bad:'var(--bad)',warn:'var(--warn)'}, al=alerts(months,days), out=outlook(months,days,targets), L=days[days.length-1];
+    const A=`<div class="card glass ${out?'s6':'s12'}"><h2>Alerts</h2><div class="sub">Latest day: ${dayLbl(L)}</div><div class="list">${al.map(([t,h,x])=>`<div class="item"><span class="dot" style="background:${c[t]}"></span><p>${h}<small>${x}</small></p></div>`).join('')}</div></div>`;
+    if(!out) return A;
+    let body;
+    if(out.kind==='done') body=`<div class="sub">${out.label}, finished</div><p class="story">Sales ${f(out.total)} EGP against a target of ${f(out.target)} EGP: <b>${out.pct.toFixed(0)}%</b>, ${out.pct>=100?'target reached':'target missed by '+f(out.target-out.total)+' EGP'}.</p>`;
+    else body=`<div class="sub">${out.label}, day ${out.done} of ${out.dim}</div>
+      <div class="list"><div class="item"><p>Sales so far<small>about ${f(out.avgSoFar)} EGP a day</small></p><b>${f(out.soFar)}</b></div>
+      <div class="item"><p>Forecast for the month<small>${out.yoy==null?'if the last 8 weeks repeat':(out.yoy>=0?'+':'−')+Math.abs(out.yoy).toFixed(1)+'% vs same month last year'}</small></p><b>${f(out.forecast)}</b></div></div>
+      ${out.target?bars([['Progress to the '+f(out.target)+' target',out.pctTarget,out.hit?'w':'b',out.pctTarget.toFixed(0)+'%']])+`<p class="note">${out.hit?'On track':'Behind'}: you need ${f(out.need)} EGP a day for the last ${out.left} days (now ${f(out.avgSoFar)}).</p>`:`<p class="note">Add a target for ${out.label} in the Targets tab of the sheet to see progress.</p>`}`;
+    return A+`<div class="card glass s6"><h2>Month outlook</h2>${body}</div>`})()}
   ${P?`<div class="card glass s12"><h2>In short</h2><div class="sub">${lbl(M)} against ${lbl(P)}</div>${narrative(P,M,lbl(P),lbl(M))}</div>`:''}
   <div class="card glass s8"><h2>Daily sales</h2><div class="sub">${lbl(M)}, EGP</div>${lineChart({series:[{name:'Sales',data:ds.map(x=>x.total),color:'#e8642c'}],xlabels:ds.map(x=>[1,8,15,22,ds.length].includes(x.d)?String(x.d):''),aria:'Daily sales',tips:ds.map(x=>dayName(x)+' '+MN[M.m-1]),tipFmt:v=>f(v)+' EGP'})}</div>
   <div class="card glass s4"><h2>Needs attention</h2><div class="sub">${lbl(M)}</div><div class="list">${items.map(([c,t,s,p])=>`<div class="item"><span class="dot" style="background:${col(c)}"></span><p>${t}<small>${s}</small></p><span class="pill ${c}">${p}</span></div>`).join('')}</div></div>
@@ -406,6 +497,15 @@ const pages = {
   <div class="card glass s6"><h2>Daily sales</h2><div class="sub">Day 1 of each period lined up</div>${ov('total',short,'Daily sales in both periods',' EGP')}</div>
   <div class="card glass s6"><h2>Daily guests</h2><div class="sub">Day 1 of each period lined up</div>${ov('guests',v=>f(v),'Daily guests in both periods','')}</div>
   ${weekdayTable(A.ds,B.ds,la,lb)}`; }},
+ patterns:{title:'Patterns', html(){
+  const T=patterns(months,days), li=(x,i)=>`<div class="item"><span class="pill">${i+1}</span><p>${dayLbl(x)} ${x.y}<small>${x.guests} guests</small></p><b>${f(x.total)}</b></div>`;
+  const yr=Object.fromEntries(T.wdYear.map(r=>[r.wd,r])), mx=Math.max(...T.season.map(r=>r.idx));
+  return `
+  <div class="card glass s6"><h2>Best 5 days</h2><div class="sub">All time, sales in EGP</div><div class="list">${T.top.map(li).join('')}</div></div>
+  <div class="card glass s6"><h2>Weakest 5 days</h2><div class="sub">All time, days with sales and guests</div><div class="list">${T.bottom.map(li).join('')}</div></div>
+  <div class="card glass s12"><h2>Weekdays</h2><div class="sub">Average per day. The last column is the most recent 12 months.</div><div class="tablewrap"><table><thead><tr><th>Day</th><th>Sales, all time</th><th>Guests, all time</th><th>Sales, last 12 months</th><th>Days counted</th></tr></thead><tbody>${T.wdAll.map(r=>`<tr><td>${WK[wkIdx(r.wd)]}</td><td>${f(r.t)}</td><td>${f(r.g)}</td><td>${yr[r.wd]?f(yr[r.wd].t):'—'}</td><td>${r.n}</td></tr>`).join('')}</tbody></table></div></div>
+  <div class="card glass s6"><h2>Season</h2><div class="sub">Sales per day by calendar month. 100 is an average month of the same year.</div>${bars(T.season.map(r=>[MN[r.m-1],r.idx/mx*100,r.idx>=100?'w':'',r.idx.toFixed(0)+' · '+r.n+' yr']))}</div>
+  <div class="card glass s6"><h2>Ramadan</h2><div class="sub">Average per day during the fast against the 30 days before. Dates are approximate.</div>${T.ram.length?`<div class="tablewrap"><table><thead><tr><th>Year</th><th>Sales a day</th><th>Guests a day</th></tr></thead><tbody>${T.ram.map(r=>`<tr><td>${r.y}</td><td>${f(r.t)} ${yoyTxt(r.t,r.tb)}</td><td>${f(r.g)} ${yoyTxt(r.g,r.gb)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="note">Not enough days around Ramadan in the data.</p>'}</div>`; }},
  payments:{title:'Payments', html(){
   const M=months[sel], gp=pct(gapOf(M),M.total);
   return `
@@ -420,6 +520,7 @@ const icons = {
   guests:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.5-4 3-6 6.5-6s6 2 6.5 6M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2.2.6 3.2 2.5 3.5 6"/>',
   compare:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   periods:'<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  patterns:'<path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/>',
   payments:'<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M7 15h3"/>'
 };
 const nav=document.getElementById('nav'), view=document.getElementById('view'), monthSel=document.getElementById('month');
@@ -492,6 +593,12 @@ view.addEventListener('change',e=>{const pi=e.target.closest('[data-per]');if(pi
   const s=e.target.closest('[data-cmp]');if(s){cmp[s.dataset.cmp]=s.dataset.cmp==='mode'?s.value:+s.value;go(current,false,true)}});
 view.addEventListener('click',e=>{const b=e.target.closest('[data-metric]');if(b){metric=b.dataset.metric;go(current,false,true)}const pb=e.target.closest('[data-preset]');if(pb){Object.assign(per,PRE[pb.dataset.preset]());go(current,false,true)}});
 monthSel.addEventListener('change',()=>{sel=+monthSel.value;{const r=months[sel];cmp.m=r.m;cmp.b=r.y;cmp.a=r.y-1}go(current,false,true)});
+document.getElementById('print').addEventListener('click',()=>print());
+document.getElementById('copy').addEventListener('click',async e=>{
+  const b=e.currentTarget, t=summary(months,days,sel,outlook(months,days,targets),alerts(months,days));
+  try{ await navigator.clipboard.writeText(t); b.textContent='Copied'; }catch(x){ prompt('Copy this text',t); }
+  setTimeout(()=>b.textContent='Copy summary',1600);
+});
 addEventListener('hashchange',()=>go(location.hash.slice(1)));
 go(location.hash.slice(1)||'overview',true);
 }
@@ -524,7 +631,8 @@ function toData(j){
     const pick=(key,alt)=>r[key]!=null?r[key]:alt;
     return {y:a.y,m:a.m,total:pick('total',a.total),guests:pick('guests',a.guests),visa:pick('visa',a.visa)||0,cash:pick('cash',a.cash)||0,insta:pick('insta',a.insta),part:a.n<dim};
   });
-  return {months,days};
+  const tg={}; (j.targets||[]).forEach(([y,m,t])=>{t=num(t); if(t!=null&&+y&&+m) tg[+y*100+ +m]=t});
+  return {months,days,targets:tg};
 }
 /*/CONV*/
 (function(){
