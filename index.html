@@ -123,6 +123,13 @@ input[type=date]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .sr{position:absolute;left:-9999px}
 .hbtn{font:500 12px var(--f-body);color:var(--ink);background:var(--glass-2);border:1px solid var(--edge);border-radius:99px;padding:7px 12px;cursor:pointer}
 .hbtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+@media (max-width:700px){
+  .hd label.pill,#print{display:none}
+  .cmpbar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 12px;align-items:center}
+  .cmpbar select,.cmpbar input{width:100%;min-width:0}
+  .seg{border-radius:18px;flex-wrap:wrap}
+  nav a{padding:7px 4px;font-size:10.5px}
+}
 @media print{
   :root{--bg:#fff;--ink:#141414;--muted:#555;--glass:#fff;--glass-2:#f3f3f3;--edge:#ccc}
   body::before,aside,.hd,#tip,.gate{display:none!important}
@@ -445,7 +452,7 @@ const pages = {
   <div class="card glass s6"><h2>Average check by month</h2><div class="sub">EGP per guest</div>${lineChart({series:[{name:'Avg check',data:months.map(r=>r.total/r.guests),color:'#4cc38a'}],xlabels:mLabels,aria:'Average check by month',tips:months.map(lbl),tipFmt:v=>f(v)+' EGP'})}</div>
   <div class="card glass s12"><h2>Average guests by weekday</h2><div class="sub">${lbl(M)}</div>${weekdayCols(ds,'guests')}</div>`; }},
 
- compare:{title:'Compare years', html(){
+ compare:{title:'Compare years',nav:'Years', html(){
   normCmp();
   const yrs=YRS.filter(y=>monthRec(y,cmp.m)), mon=MN[cmp.m-1], ya=cmp.a, yb=cmp.b;
   const opt=(arr,v,lab)=>arr.map(x=>`<option value="${x}"${x===v?' selected':''}>${lab?lab(x):x}</option>`).join('');
@@ -477,7 +484,7 @@ const pages = {
   return `${controls}<div class="card glass s12"><h2>In short</h2><div class="sub">${mon} ${yb} compared with ${mon} ${ya}</div>${narrative(ra,rb,mon+' '+ya,mon+' '+yb)}</div>${side(rose,'What went up','good')}${side(fell,'What went down','bad')}${table}${headToHead(cmp.m,ya,yb,cmp.mode)}
   <div class="card glass s12"><h2>${X.name} across the year</h2><div class="sub">Each line is one year</div>${seg}${lineChart({series:YRS.map(y=>({name:String(y),color:YC[y],data:MN.map((_,i)=>mv(monthRec(y,i+1)))})),xlabels:MN,fmt:X.fmt,aria:X.name+' by month and year',tipFmt:v=>f(v)+(X.unit?' '+X.unit:'')})}</div>
   <div class="card glass s12"><h2>Every month, every year</h2><div class="sub">${X.name}${X.unit?', '+X.unit:''}. ${mon} is highlighted.</div><div class="tablewrap"><table><thead><tr><th>Month</th>${YRS.map(y=>`<th>${y}</th>`).join('')}<th>2025 vs 2024</th><th>2026 vs 2025</th></tr></thead><tbody>${rows}</tbody></table></div></div>`; }},
- periods:{title:'Custom periods', html(){
+ periods:{title:'Custom periods',nav:'Periods', html(){
   const mk=(s,e)=>{const ds=days.filter(x=>{const k=dk(x);return k>=s&&k<=e});return ds.length?{ds,total:ds.reduce((a,x)=>a+x.total,0),guests:ds.reduce((a,x)=>a+x.guests,0)}:null};
   const A=mk(per.as,per.ae), B=mk(per.bs,per.be);
   const inp=(id,key,label)=>`<label for="${id}">${label}</label><input type="date" id="${id}" data-per="${key}" value="${kIso(per[key])}" min="${kIso(firstK)}" max="${kIso(lastK)}">`;
@@ -524,7 +531,7 @@ const icons = {
   payments:'<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M7 15h3"/>'
 };
 const nav=document.getElementById('nav'), view=document.getElementById('view'), monthSel=document.getElementById('month');
-nav.innerHTML=Object.keys(pages).map(k=>`<a href="#${k}" data-k="${k}"><svg viewBox="0 0 24 24" aria-hidden="true">${icons[k]}</svg>${pages[k].title}</a>`).join('');
+nav.innerHTML=Object.keys(pages).map(k=>`<a href="#${k}" data-k="${k}"><svg viewBox="0 0 24 24" aria-hidden="true">${icons[k]}</svg>${pages[k].nav||pages[k].title}</a>`).join('');
 monthSel.innerHTML=months.map((r,i)=>`<option value="${i}">${lbl(r)}</option>`).reverse().join('');
 monthSel.value=String(sel);
 const last=months[months.length-1];
