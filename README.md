@@ -9,4 +9,8 @@ through a small Apps Script web app, using a password that only you know.
 
 Edit `WEBAPP_URL` (the `URL_` constant near the bottom of `index.html`) only if the Apps Script is deployed again as a new web app.
 Targets: add a `Targets` tab to the sheet with `Year, MonthNumber, Target_EGP` (the Apps Script must return it, see below).
-Tests: `node tests/conv.test.js` and `node tests/logic.test.js`.
+- **+ Add day** (top right): paste the daily message or type the numbers. The day is written to `Daily_Data`;
+  if the day is already saved you see old and new and must press **Replace saved day**. Every write is logged in the `Entry_Log` tab.
+- The Apps Script code is in `apps-script/Code.gs` (backup copy). After changing it: Deploy > Manage deployments > edit > New version.
+
+Tests: `node tests/conv.test.js`, `node tests/logic.test.js`, `node tests/entry.test.js`, `node tests/apps-script.test.js`.

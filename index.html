@@ -125,6 +125,22 @@ input[type=date]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .gbox .eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);padding:6px 12px;background:none;color:var(--muted);font-weight:500}
 .hbtn{font:500 12px var(--f-body);color:var(--ink);background:var(--glass-2);border:1px solid var(--edge);border-radius:99px;padding:7px 12px;cursor:pointer}
 .hbtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.add{background:var(--accent);color:#fff;border-color:transparent}
+.dlg{width:min(460px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:22px;border:1px solid var(--edge);border-radius:20px;background:#17191a;color:var(--ink)}
+.dlg::backdrop{background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
+.dlg h2{margin:0 0 12px;font:600 18px var(--f-display)}
+.dlg .lab{display:block;color:var(--muted);font-size:12px;margin:0 0 6px}
+.dlg textarea,.dlg input{width:100%;box-sizing:border-box;font:500 14px var(--f-body);color:var(--ink);background:var(--glass-2);border:1px solid var(--edge);border-radius:12px;padding:9px 12px}
+.dlg textarea{resize:vertical;margin-bottom:8px}
+.dlg :is(textarea,input,button):focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.dlg input[aria-invalid=true]{border-color:var(--bad)}
+.egrid{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 12px;align-items:center;margin-top:10px}
+.egrid label{color:var(--muted);font-size:13px}
+.ew{color:var(--warn)}
+.eold table{margin-top:8px}
+.eact{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.ebtn{font:600 13px var(--f-body);color:#fff;background:var(--accent);border:0;border-radius:99px;padding:9px 18px;cursor:pointer}
+.ebtn:disabled{opacity:.6;cursor:wait}
 @media (max-width:700px){
   .hd label.pill,#print{display:none}
   .cmpbar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 12px;align-items:center}
@@ -148,12 +164,34 @@ input[type=date]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
   <main>
     <header>
       <div><small id="date"></small><h1 id="title">Overview</h1></div>
-      <div class="hd"><label for="month" class="pill">Month</label><select id="month"></select><button id="copy" type="button" class="hbtn">Copy summary</button><button id="print" type="button" class="hbtn">Print / PDF</button></div>
+      <div class="hd"><label for="month" class="pill">Month</label><select id="month"></select><button id="copy" type="button" class="hbtn">Copy summary</button><button id="print" type="button" class="hbtn">Print / PDF</button><button id="add" type="button" class="hbtn add" hidden>+ Add day</button></div>
     </header>
     <div id="view" class="grid"></div>
   </main>
 </div>
 
+<dialog id="entry" class="dlg" aria-labelledby="eh">
+<form id="eform" novalidate>
+<h2 id="eh">Add a day</h2>
+<label for="emsg" class="lab">Paste the daily message (optional)</label>
+<textarea id="emsg" rows="4" placeholder="October. 31/10/2026&#10;Total. 368,581.73&#10;Visa. 350,450.35&#10;Cash. 9,029.38&#10;insta. 9,102&#10;Guest. 424"></textarea>
+<button type="button" id="efill" class="hbtn">Fill the form from the message</button>
+<p id="efillmsg" class="note" role="status"></p>
+<div class="egrid">
+<label for="edate">Date</label><input id="edate" type="date" required>
+<label for="etotal">Total sales</label><input id="etotal" inputmode="decimal" autocomplete="off" required>
+<label for="eguests">Guests</label><input id="eguests" inputmode="numeric" autocomplete="off" required>
+<label for="evisa">Visa</label><input id="evisa" inputmode="decimal" autocomplete="off">
+<label for="ecash">Cash</label><input id="ecash" inputmode="decimal" autocomplete="off">
+<label for="einsta">Instapay</label><input id="einsta" inputmode="decimal" autocomplete="off">
+</div>
+<p class="note">Leave a payment box empty if you don't have it. Empty means not provided, not zero.</p>
+<p id="ewarn" class="note ew" role="status"></p>
+<div id="eold" class="eold" hidden></div>
+<p id="emsgout" class="note" role="alert"></p>
+<div class="eact"><button type="button" id="ecancel" class="hbtn">Cancel</button><button type="submit" id="esave" class="ebtn">Save day</button></div>
+</form>
+</dialog>
 <div id="gate" class="gate" hidden><div class="glass gbox"><h2>Eatery sales</h2><p id="gmsg"></p>
 <form id="gform" hidden><label for="gkey" class="sr">Password</label><span class="pw"><input id="gkey" type="password" autocomplete="current-password" placeholder="Password"><button id="geye" type="button" class="eye" aria-label="Show password" aria-pressed="false">Show</button></span><button type="submit">Open</button></form>
 <button id="gretry" type="button" hidden>Try again</button></div></div>
@@ -612,6 +650,51 @@ addEventListener('hashchange',()=>go(location.hash.slice(1)));
 go(location.hash.slice(1)||'overview',true);
 }
 
+/*ENTRY*/
+// Reads a pasted daily message (same rules as the Eatery sales app): labels in English or Arabic, any order.
+const MESSAGE_LABELS={
+  total:['total','tot','اجمالي','إجمالي','الاجمالي','الإجمالي','توتال'],
+  visa:['visa','فيزا'],
+  cash:['cash','كاش','نقدي','نقدا','نقداً'],
+  insta:['insta','instapay','انستا','انستاباي','إنستا','إنستاباي'],
+  guests:['guest','guests','avg','ضيوف','الضيوف','عددالضيوف','جيست']};
+const BRANCH_WORDS=['october','اكتوبر','أكتوبر','فرعاكتوبر','فرعأكتوبر'];
+const westernDigits=t=>t.replace(/[٠-٩]/g,c=>String(c.charCodeAt(0)-0x0660)).replace(/[۰-۹]/g,c=>String(c.charCodeAt(0)-0x06F0));
+const pad2=n=>String(n).padStart(2,'0');
+function parseDailyMessage(text){
+  const values={date:'',total:'',visa:'',cash:'',insta:'',guests:''}, found=[], unknown=[];
+  for(const raw of westernDigits(String(text||'')).split(/\r?\n/)){
+    const line=raw.trim(); if(!line) continue;
+    const dm=line.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4}|\d{2})(?!\d)/);
+    if(dm&&!values.date){values.date=(dm[3].length===2?'20'+dm[3]:dm[3])+'-'+pad2(dm[2])+'-'+pad2(dm[1]);found.push('date');continue;}
+    const m=line.match(/^(.*?)[\s.:=\-–]*([\d][\d,.\s]*)$/); if(!m) continue;
+    const label=m[1].toLowerCase().replace(/[\s.:=\-–_]/g,'');
+    const field=Object.keys(MESSAGE_LABELS).find(k=>MESSAGE_LABELS[k].includes(label));
+    if(!field){ if(!BRANCH_WORDS.includes(label)) unknown.push(line); continue; }
+    values[field]=m[2].replace(/[\s,]/g,''); found.push(field);
+  }
+  return {values,found,unknown};
+}
+const cairoToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Cairo'}).format(new Date());
+// Checks the form. Same limits as the Apps Script, which checks again before writing.
+function validateEntry(inp,today){
+  const errors={}, amt=v=>{v=westernDigits(String(v??'')).replace(/[\s,]/g,''); return v===''?null:(/^\d+(\.\d+)?$/.test(v)?+v:NaN)};
+  const rec={date:String(inp.date||''),total:amt(inp.total),visa:amt(inp.visa),cash:amt(inp.cash),insta:amt(inp.insta),guests:amt(inp.guests)};
+  const d=new Date(rec.date+'T12:00:00Z');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(rec.date)||isNaN(d)||d.toISOString().slice(0,10)!==rec.date) errors.date='Pick a date';
+  else if(rec.date>today) errors.date='Future dates are not allowed';
+  else if(rec.date<'2024-01-01') errors.date='Dates start from 1 Jan 2024';
+  if(rec.total===null) errors.total='Enter the total';
+  else if(!(rec.total<=5e6)) errors.total='Enter a number up to 5,000,000';
+  if(rec.guests===null) errors.guests='Enter the number of guests';
+  else if(!(Number.isInteger(rec.guests)&&rec.guests<=5000)) errors.guests='Whole number up to 5,000';
+  ['visa','cash','insta'].forEach(k=>{ if(rec[k]!==null&&!(rec[k]<=5e6)) errors[k]='Enter a number up to 5,000,000' });
+  const pays=['visa','cash','insta'].map(k=>rec[k]).filter(v=>v!==null);
+  const sum=pays.reduce((a,b)=>a+b,0), warn=!Object.keys(errors).length&&pays.length&&Math.abs(sum-rec.total)>1
+    ?`Visa + Cash + Instapay = ${Math.round(sum).toLocaleString('en-US')}, which is not the total. You can still save.`:'';
+  return {rec,errors,warn};
+}
+/*/ENTRY*/
 /*CONV*/
 // A date may arrive as 'yyyy-MM-dd' or as an ISO timestamp of local midnight (e.g. 08:00Z = midnight in a zone west of UTC, 22:00Z = midnight east of it).
 function ymd(v){
@@ -655,13 +738,66 @@ function toData(j){
     if(!Array.isArray(j.daily)||!Array.isArray(j.monthly)) throw new Error('shape');
     const d=toData(j); d.raw=`received ${j.daily.length} daily and ${j.monthly.length} monthly rows; first daily row: ${JSON.stringify(j.daily[0])}`; return d;
   }
+
+  // ---- quick entry: writes one day to Daily_Data through the Apps Script ----
+  function setupEntry(key,d){
+    const dlg=document.getElementById('entry'), F=id=>document.getElementById(id), add=F('add');
+    const fields=['date','total','guests','visa','cash','insta'], el=k=>F('e'+k);
+    let confirmReplace=false, busy=false;
+    const fmt=v=>v===''||v==null?'—':Number(v).toLocaleString('en-US',{maximumFractionDigits:2});
+    const reset=()=>{confirmReplace=false; F('eold').hidden=true; F('esave').textContent='Save day'};
+    const showErr=errs=>fields.forEach(k=>{const i=el(k); i.setAttribute('aria-invalid',errs[k]?'true':'false'); i.title=errs[k]||''});
+    const read=()=>Object.fromEntries(fields.map(k=>[k,el(k).value]));
+    const check=()=>{const v=validateEntry(read(),cairoToday()); F('ewarn').textContent=v.warn; return v};
+    add.hidden=false;
+    add.addEventListener('click',()=>{
+      const L=d.days[d.days.length-1], next=new Date(Date.UTC(L[0],L[1]-1,L[2]+1)).toISOString().slice(0,10), today=cairoToday();
+      F('eform').reset(); reset(); showErr({}); F('efillmsg').textContent=''; F('emsgout').textContent=''; F('ewarn').textContent='';
+      el('date').max=today; el('date').value=next<today?next:today;
+      dlg.showModal(); F('emsg').focus();
+    });
+    F('ecancel').addEventListener('click',()=>dlg.close());
+    F('eform').addEventListener('input',e=>{ if(e.target.id!=='emsg'){ reset(); check(); } });
+    F('efill').addEventListener('click',()=>{
+      const {values,found,unknown}=parseDailyMessage(F('emsg').value);
+      if(!found.length){F('efillmsg').textContent='No date or numbers found. Use lines like "Total. 368,581.73" and a date like 31/10/2026.';return}
+      if(values.date) el('date').value=values.date;
+      ['total','guests','visa','cash','insta'].forEach(k=>el(k).value=values[k]);
+      const names={date:'Date',total:'Total',visa:'Visa',cash:'Cash',insta:'Instapay',guests:'Guests'}, miss=Object.keys(names).filter(k=>!found.includes(k));
+      F('efillmsg').textContent='Filled: '+found.map(k=>names[k]).join(', ')+'.'+(miss.length?' Not in the message (left empty): '+miss.map(k=>names[k]).join(', ')+'.':'')
+        +(unknown.length?' Not understood: "'+unknown.join('", "')+'".':'')+' Check the numbers, then Save.';
+      reset(); showErr({}); check();
+    });
+    F('eform').addEventListener('submit',async e=>{
+      e.preventDefault(); if(busy) return;
+      const v=check(); showErr(v.errors); const out=F('emsgout');
+      if(Object.keys(v.errors).length){ out.textContent='Fix the boxes marked in red: '+Object.values(v.errors).join('. ')+'.'; el(Object.keys(v.errors)[0]).focus(); return; }
+      busy=true; F('esave').disabled=true; out.textContent='Saving…';
+      try{
+        const r=await fetch(URL_,{method:'POST',body:JSON.stringify({key,...v.rec,overwrite:confirmReplace})}); // text/plain: no CORS preflight
+        const j=await r.json();
+        if(j.error==='unauthorized'){ st.del(); out.textContent='The password has changed. Reload the page and enter it again. Nothing was saved.'; return; }
+        if(j.status==='exists'){
+          const o=j.old||[], n=[v.rec.total,v.rec.visa,v.rec.cash,v.rec.insta,v.rec.guests], lab=['Total','Visa','Cash','Instapay','Guests'];
+          const box=F('eold'); box.textContent='';
+          const t=document.createElement('table'); t.innerHTML='<thead><tr><th>'+v.rec.date+'</th><th>Saved now</th><th>Your entry</th></tr></thead>';
+          const tb=document.createElement('tbody'); lab.forEach((l,i)=>{const tr=tb.insertRow(); [l,fmt(o[i]),fmt(n[i])].forEach(x=>tr.insertCell().textContent=x)}); t.appendChild(tb);
+          box.append(t); box.hidden=false; confirmReplace=true; F('esave').textContent='Replace saved day';
+          out.textContent='This day is already in the sheet. Check old and new, then press Replace saved day, or Cancel.'; return;
+        }
+        if(j.status==='saved'){ out.textContent=(j.replaced?'Replaced':'Saved')+'. Reloading the dashboard…'; setTimeout(()=>location.reload(),900); return; }
+        out.textContent='Not saved: '+(j.message||'the sheet answered with an error')+'.';
+      }catch(x){ out.textContent='Not saved: could not reach the sheet. Your numbers are still in the form, try again.'; }
+      finally{ busy=false; F('esave').disabled=false; }
+    });
+  }
   async function start(key){
     show('Loading your sales…');
     try{
       const d=await fetchData(key);
       if(!d){ st.del(); return show('That password is not right. Try again.',{ask:true}); }
       if(!d.months.length) return show('The sheet has no sales rows yet ('+d.raw+').',{again:true});
-      st.set(key); gate.hidden=true; boot(d);
+      st.set(key); gate.hidden=true; boot(d); setupEntry(key,d);
     }catch(e){ show('Could not reach the sheet. Check the internet and try again.',{again:true}); }
   }
   const eye=document.getElementById('geye');
