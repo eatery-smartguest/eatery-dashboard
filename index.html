@@ -529,14 +529,14 @@ function toData(j){
     const r=await fetch(URL_+'?key='+encodeURIComponent(key)); if(!r.ok) throw new Error('http '+r.status);
     const j=await r.json(); if(j.error) return null;
     if(!Array.isArray(j.daily)||!Array.isArray(j.monthly)) throw new Error('shape');
-    return toData(j);
+    const d=toData(j); d.raw=`received ${j.daily.length} daily and ${j.monthly.length} monthly rows; first daily row: ${JSON.stringify(j.daily[0])}`; return d;
   }
   async function start(key){
     show('Loading your sales…');
     try{
       const d=await fetchData(key);
       if(!d){ st.del(); return show('That password is not right. Try again.',{ask:true}); }
-      if(!d.months.length) return show('The sheet has no sales rows yet.',{again:true});
+      if(!d.months.length) return show('The sheet has no sales rows yet ('+d.raw+').',{again:true});
       st.set(key); gate.hidden=true; boot(d);
     }catch(e){ show('Could not reach the sheet. Check the internet and try again.',{again:true}); }
   }
