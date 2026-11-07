@@ -1,0 +1,11 @@
+# Eatery sales dashboard
+
+A static web page. It holds **no sales data**: when you open it, it asks the Google Sheet for the numbers
+through a small Apps Script web app, using a password that only you know.
+
+- Open the page, type the password once. The browser remembers it.
+- Add the day's numbers in the Google Sheet (`Daily_Data`). Reload the page and they show up.
+- Months missing from `Monthly_Data` are rebuilt from the daily rows. The month in progress is marked "so far".
+
+Edit `WEBAPP_URL` (the `URL_` constant near the bottom of `index.html`) only if the Apps Script is deployed again as a new web app.
+Test: `node tests/conv.test.js`.

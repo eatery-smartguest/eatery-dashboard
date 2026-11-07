@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Eatery Glass Dashboard</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Figtree:wght@400;500;600&display=swap">
+<style>
+
+/* Layout: glass sidebar + 12-column card grid; cards land in reading order, pages cross-fade. Single dark look by choice. */
+:root{
+  --bg:#0c0e0f; --ink:#f2eee8; --muted:#9a948b; --accent:#e8642c;
+  --good:#4cc38a; --warn:#f0b445; --bad:#ef5b5b;
+  --glass:rgba(255,255,255,.055); --glass-2:rgba(255,255,255,.09); --edge:rgba(255,255,255,.11);
+  --f-display:"Bricolage Grotesque",system-ui,sans-serif; --f-body:"Figtree",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:auto}
+body{background:var(--bg);color:var(--ink);font:400 14px/1.45 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px;
+  min-height:100vh;position:relative;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(60% 50% at 80% 8%,rgba(232,100,44,.20),transparent 70%),
+             radial-gradient(50% 45% at 8% 90%,rgba(76,195,138,.10),transparent 70%),
+             radial-gradient(40% 40% at 50% 50%,rgba(255,255,255,.03),transparent 70%)}
+.app{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;max-width:1320px;margin:0 auto}
+.glass{background:var(--glass);border:1px solid var(--edge);border-radius:18px;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+aside{padding:16px;display:flex;flex-direction:column;gap:20px;position:sticky;top:16px;align-self:start;height:calc(100vh - 32px);max-height:640px}
+.brand{display:flex;gap:10px;align-items:center;font:700 18px var(--f-display)}
+.brand i{width:30px;height:30px;border-radius:9px;background:var(--accent);display:grid;place-items:center}
+.brand small{display:block;font:400 11px var(--f-body);color:var(--muted)}
+nav{display:flex;flex-direction:column;gap:4px}
+nav a{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;color:var(--muted);text-decoration:none;font-weight:500;transition:background .25s,color .25s}
+nav a:hover{background:var(--glass-2);color:var(--ink)}
+nav a[aria-current=page]{background:var(--accent);color:#fff}
+nav a:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+nav svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.side-foot{margin-top:auto;padding:12px;border-radius:12px;background:var(--glass);font-size:12px;color:var(--muted)}
+.side-foot b{display:block;color:var(--ink);font:700 16px var(--f-display);font-variant-numeric:tabular-nums}
+main{min-width:0;display:flex;flex-direction:column;gap:16px}
+header{display:flex;justify-content:space-between;align-items:end;gap:12px;flex-wrap:wrap;padding:6px 4px}
+header small{color:var(--muted)}
+h1{margin:0;font:700 clamp(24px,4vw,34px)/1.1 var(--f-display);text-wrap:balance}
+.pill{display:inline-flex;gap:6px;align-items:center;padding:5px 11px;border-radius:99px;border:1px solid var(--edge);background:var(--glass);font-size:12px;color:var(--muted)}
+.pill.good{color:var(--good)} .pill.warn{color:var(--warn)} .pill.bad{color:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px}
+.card{padding:18px;min-width:0}
+.s3{grid-column:span 3}.s4{grid-column:span 4}.s5{grid-column:span 5}.s7{grid-column:span 7}.s8{grid-column:span 8}.s12{grid-column:span 12}
+.card h2{margin:0 0 2px;font:600 15px var(--f-display)}
+.card .sub{color:var(--muted);font-size:12px;margin-bottom:14px}
+.kpi .v{font:700 clamp(24px,3vw,30px)/1.1 var(--f-display);font-variant-numeric:tabular-nums;margin:8px 0 6px}
+.kpi .l{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.07em}
+.delta{font-size:12px;font-weight:600}.delta.up{color:var(--good)}.delta.down{color:var(--bad)}
+svg.chart{width:100%;height:auto;display:block;overflow:visible}
+svg text{fill:var(--muted);font:11px var(--f-body)}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:13px}
+.bars{display:flex;flex-direction:column;gap:13px}
+.track{height:8px;border-radius:9px;background:var(--glass-2);overflow:hidden;margin-top:6px}
+.fill{height:100%;border-radius:9px;background:var(--accent)}
+.fill.g{background:var(--good)}.fill.w{background:var(--warn)}.fill.b{background:var(--bad)}
+.cols{display:flex;align-items:end;gap:8px;height:170px;padding-top:8px}
+.col{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:end;align-items:center;gap:6px;height:100%}
+.col .bar{width:100%;border-radius:8px 8px 3px 3px;background:var(--glass-2);transition:background .2s}
+.col .bar.hi{background:var(--accent)}
+.col span{font-size:11px;color:var(--muted)}
+.list{display:flex;flex-direction:column;gap:10px}
+.item{display:flex;gap:12px;align-items:center;padding:11px 12px;border-radius:12px;background:var(--glass)}
+.item .dot{width:9px;height:9px;border-radius:50%;flex:none}
+.item p{margin:0;flex:1;min-width:0}.item p small{display:block;color:var(--muted)}
+.ring{display:grid;place-items:center;position:relative}
+.ring b{position:absolute;font:700 28px var(--f-display);font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13px}
+th{color:var(--muted);font-weight:500;text-align:right;padding:8px 10px;border-bottom:1px solid var(--edge);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+td{padding:10px;text-align:right;border-bottom:1px solid var(--edge)}
+th:first-child,td:first-child{text-align:left}
+tr:last-child td{border-bottom:0}
+@media (max-width:900px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  aside{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:20;height:auto;max-height:none;flex-direction:row;padding:8px max(12px,env(safe-area-inset-left,0px)) calc(8px + env(safe-area-inset-bottom,0px));border-radius:18px 18px 0 0;background:rgba(18,20,21,.82)}
+  .brand,.side-foot{display:none}
+  nav{flex-direction:row;flex:1;justify-content:space-around}
+  nav a{flex-direction:column;gap:3px;font-size:11px;padding:7px 12px}
+  main{padding-bottom:84px}
+  .s4,.s5,.s7,.s8{grid-column:span 12}.s3{grid-column:span 6}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+.s6{grid-column:span 6}
+@media (max-width:900px){.s6{grid-column:span 12}}
+select{font:500 13px var(--f-body);color:var(--ink);background:var(--glass-2);border:1px solid var(--edge);border-radius:99px;padding:7px 12px;cursor:pointer}
+select:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+select option{background:#1a1d1e;color:var(--ink)}
+.hd{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.note{color:var(--muted);font-size:12px;margin:12px 0 0}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:0 0 8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+.seg{display:inline-flex;gap:4px;padding:3px;border-radius:99px;background:var(--glass);border:1px solid var(--edge);margin-bottom:12px}
+.seg button{font:500 12px var(--f-body);color:var(--muted);background:none;border:0;border-radius:99px;padding:6px 12px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--accent);color:#fff}
+.seg button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+tr.sel td{background:var(--glass-2)}
+.yc .row{padding:7px 0;border-bottom:1px solid var(--edge)}.yc .row:last-child{border:0}
+.gap{font:700 26px var(--f-display);margin:16px 0 0;font-variant-numeric:tabular-nums}.gap.up{color:var(--good)}.gap.down{color:var(--bad)}.gap small{font:600 13px var(--f-body);margin-left:6px}
+.cmpbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.cmpbar label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.07em}
+svg.chart{touch-action:pan-y;cursor:crosshair}
+#tip{position:fixed;z-index:30;pointer-events:none;padding:8px 10px;border-radius:10px;background:rgba(24,27,28,.94);border:1px solid var(--edge);font-size:12px;line-height:1.5;min-width:110px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+#tip b{display:block;margin-bottom:2px;font:600 12px var(--f-body)}#tip i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}#tip span{display:flex;justify-content:space-between;gap:12px;font-variant-numeric:tabular-nums}
+.story{margin:0 0 10px;line-height:1.6;max-width:78ch}.story b{font-weight:600}
+input[type=date]{font:500 13px var(--f-body);color:var(--ink);background:var(--glass-2);border:1px solid var(--edge);border-radius:99px;padding:6px 12px}
+input[type=date]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.col b{font:600 10px var(--f-body);color:var(--ink);font-variant-numeric:tabular-nums}
+.insg{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin-top:12px}
+.ins{padding:12px 14px;border-radius:14px;background:var(--glass-2);border-left:3px solid var(--muted)}
+.ins small{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.07em}
+.ins b{display:block;font:600 16px var(--f-display);margin:4px 0 4px}
+.ins p{margin:0;color:var(--muted);font-size:12.5px;line-height:1.5}
+.gate{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px;background:rgba(10,12,12,.82);backdrop-filter:blur(10px)}
+.gate[hidden],#gform[hidden],#gretry[hidden]{display:none}
+.gbox{width:min(360px,100%);padding:24px;border-radius:20px;text-align:center}.gbox h2{margin:0 0 8px}.gbox p{color:var(--muted);margin:0 0 16px}
+.gbox form{display:flex;gap:8px}.gbox input{flex:1;min-width:0;font:500 14px var(--f-body);color:var(--ink);background:var(--glass-2);border:1px solid var(--edge);border-radius:99px;padding:10px 14px}
+.gbox button{font:600 13px var(--f-body);color:#fff;background:var(--accent);border:0;border-radius:99px;padding:10px 18px;cursor:pointer}
+.gbox input:focus-visible,.gbox button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.sr{position:absolute;left:-9999px}
+</style>
+
+<div class="app">
+  <aside class="glass">
+    <div class="brand"><i><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M6 3v7a3 3 0 0 0 6 0V3M9 3v18M18 3c-2 2-3 5-3 8h3v10"/></svg></i><div>Eatery<small>October branch</small></div></div>
+    <nav id="nav" aria-label="Pages"></nav>
+    <div class="side-foot">2026 so far<b id="foot">—</b></div>
+  </aside>
+  <main>
+    <header>
+      <div><small id="date"></small><h1 id="title">Overview</h1></div>
+      <div class="hd"><label for="month" class="pill">Month</label><select id="month"></select></div>
+    </header>
+    <div id="view" class="grid"></div>
+  </main>
+</div>
+
+<div id="gate" class="gate" hidden><div class="glass gbox"><h2>Eatery sales</h2><p id="gmsg"></p>
+<form id="gform" hidden><label for="gkey" class="sr">Password</label><input id="gkey" type="password" autocomplete="current-password" placeholder="Password"><button type="submit">Open</button></form>
+<button id="gretry" type="button" hidden>Try again</button></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+function boot(DATA){
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const f = n => Math.round(n).toLocaleString('en-US');
+const MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const WK = ['Sat','Sun','Mon','Tue','Wed','Thu','Fri'];            // Egyptian week order
+const wkIdx = wd => (wd+1)%7;                                       // Mon=1 -> index 2, Sat=6 -> 0
+const short = v => v>=1e6 ? (v/1e6).toFixed(1).replace(/\.0$/,'')+'M' : v>=1e3 ? Math.round(v/1e3)+'k' : String(Math.round(v));
+const pct = (a,b) => b ? (a/b*100) : 0;
+
+/* ---------- data ---------- */
+const months = DATA.months;                    // {y,m,total,guests,visa,cash}
+const key = (y,m) => y*100+m;
+const idxOf = {}; months.forEach((r,i)=>idxOf[key(r.y,r.m)]=i);
+const days = DATA.days.map(([y,m,d,wd,total,guests])=>({y,m,d,wd,total,guests}));
+const daysOf = (y,m) => days.filter(x=>x.y===y&&x.m===m);
+const lbl = r => MN[r.m-1]+' '+r.y+(r.part?' so far':'');
+const itemised = r => r.visa+r.cash+(r.insta||0);
+const gapOf = r => Math.max(0, r.total-itemised(r));
+const mLabels = months.map(r=>r.m===1?String(r.y):'');
+let sel = months.map(r=>!r.part).lastIndexOf(true); if(sel<0) sel=months.length-1;   // default to the last complete month
+
+/* ---------- pieces ---------- */
+const REG=[]; const reg=c=>REG.push(c)-1;
+function niceMax(v){ const p=Math.pow(10,Math.floor(Math.log10(v))); for(const s of [1,1.5,2,2.5,3,4,5,6,8,10]) if(s*p>=v*1.02) return s*p; return 10*p; }
+function lineChart({series,xlabels,fmt=short,w=640,h=230,aria='Line chart',tips,tipFmt=v=>f(v)}){
+  const L=48,R=14,T=12,B=26;
+  const all=series.flatMap(s=>s.data.filter(v=>v!=null)); const max=niceMax(Math.max(...all));
+  const n=xlabels.length, x=i=>L+i*(w-L-R)/Math.max(n-1,1), y=v=>T+(1-v/max)*(h-T-B);
+  const ticks=[0,.25,.5,.75,1].map(t=>max*t);
+  const paths=series.map((s,si)=>{
+    let d='',last=null;
+    s.data.forEach((v,i)=>{ if(v==null){return} d+=(last===i-1&&last!==null?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1)+' '; last=i; });
+    const lastI=s.data.map(v=>v!=null).lastIndexOf(true);
+    let area='';
+    if(series.length===1){ const first=s.data.findIndex(v=>v!=null); area=`<path class="area" d="${d} L${x(lastI)} ${y(0)} L${x(first)} ${y(0)} Z" fill="url(#ar)"/>`; }
+    return area+`<path class="draw" d="${d}" pathLength="1" fill="none" stroke="${s.color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${x(lastI)}" cy="${y(s.data[lastI])}" r="4.5" fill="${s.color}" stroke="#0c0e0f" stroke-width="2"/>`;
+  }).join('');
+  return `${series.length>1?`<div class="legend">${series.map(s=>`<span><i style="background:${s.color}"></i>${s.name}</span>`).join('')}</div>`:''}
+  <svg class="chart" data-cid="${reg({mode:'line',w,h,L,R,T,B,max,n,labels:tips||xlabels,fmt:tipFmt,series:series.map(s=>({name:s.name,color:s.color,vals:s.data}))})}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${aria}">
+   <defs><linearGradient id="ar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8642c" stop-opacity=".38"/><stop offset="1" stop-color="#e8642c" stop-opacity="0"/></linearGradient></defs>
+   ${ticks.map(t=>`<line x1="${L}" x2="${w-R}" y1="${y(t)}" y2="${y(t)}" stroke="rgba(255,255,255,.08)"/><text x="${L-8}" y="${y(t)+4}" text-anchor="end">${fmt(t)}</text>`).join('')}
+   ${xlabels.map((t,i)=>t?`<text x="${x(i)}" y="${h-6}" text-anchor="middle">${t}</text>`:'').join('')}
+   ${paths}</svg>`;
+}
+function ring(p,label){
+  const r=52,c=2*Math.PI*r;
+  return `<div class="ring"><svg width="140" height="140" viewBox="0 0 140 140" aria-hidden="true"><circle cx="70" cy="70" r="${r}" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="11"/><circle class="rg" cx="70" cy="70" r="${r}" fill="none" stroke="#e8642c" stroke-width="11" stroke-linecap="round" stroke-dasharray="${c*p} ${c}" transform="rotate(-90 70 70)"/></svg><b>${label}</b></div>`;
+}
+const firstInsta=(()=>{const r=months.find(x=>x.insta!=null);return r?MN[r.m-1]+' '+r.y:'—'})();
+const instaBar=(M,full)=>M.insta==null?[]:[['Instapay',pct(M.insta,M.total),'w',(full?f(M.insta)+' EGP · ':'')+pct(M.insta,M.total).toFixed(1)+'%']];
+const bars = rows => `<div class="bars">${rows.map(([n,p,c,txt])=>`<div><div class="row"><span>${n}</span><span>${txt}</span></div><div class="track"><div class="fill ${c||''}" style="width:${Math.min(100,Math.max(0,p))}%"></div></div></div>`).join('')}</div>`;
+const delta = (cur,prev) => prev ? `<span class="delta ${cur>=prev?'up':'down'}">${cur>=prev?'▲':'▼'} ${Math.abs((cur/prev-1)*100).toFixed(1)}%</span> <span class="sub">vs last month</span>` : `<span class="sub">First month in the data</span>`;
+const kpi = (l,val,sub,count) => `<div class="card glass kpi s3"><div class="l">${l}</div><div class="v" ${count||''}>${val}</div>${sub}</div>`;
+const cols = rows => `<div class="cols">${rows.map(([n,v,t,hi])=>`<div class="col"><b>${t}</b><div class="bar ${hi?'hi':''}" style="height:${Math.max(v,2)}%"></div><span>${n}</span></div>`).join('')}</div>`;
+const weekdayCols = (ds,field) => {
+  const sum=Array(7).fill(0),cnt=Array(7).fill(0);
+  ds.forEach(x=>{const i=wkIdx(x.wd);sum[i]+=x[field];cnt[i]++});
+  const avg=sum.map((s,i)=>cnt[i]?s/cnt[i]:0), mx=Math.max(...avg);
+  return cols(WK.map((n,i)=>[n,avg[i]/mx*100,short(avg[i]),avg[i]===mx]));
+};
+const dayName = x => WK[wkIdx(x.wd)]+' '+x.d;
+
+const METRICS={sales:{name:'Sales',val:r=>r.total,fmt:short,unit:'EGP'},guests:{name:'Guests',val:r=>r.guests,fmt:short,unit:''},check:{name:'Average check',val:r=>r.total/r.guests,fmt:v=>f(v),unit:'EGP'}};
+let metric='sales';
+const cmp={m:months[months.length-1].m,b:months[months.length-1].y,a:months[months.length-1].y-1,mode:'date'};
+function normCmp(){const ys=YRS.filter(y=>monthRec(y,cmp.m)); if(!ys.includes(cmp.b)) cmp.b=ys[ys.length-1]; if(!ys.includes(cmp.a)||cmp.a===cmp.b) cmp.a=ys.find(y=>y!==cmp.b)||cmp.b;}
+const monthRec=(y,m)=>{const i=idxOf[key(y,m)];return i==null?null:months[i]};
+const YRS=[2024,2025,2026], YC={2024:'#9a948b',2025:'#f0b445',2026:'#e8642c'};
+const yoyTxt=(c,p)=>p?`<span class="delta ${c>=p?'up':'down'}">${c>=p?'▲':'▼'} ${Math.abs((c/p-1)*100).toFixed(1)}%</span>`:'<span class="sub">—</span>';
+
+function divBars(diffs,fmt,aria,tips,tipFmt){
+  const w=640,h=210,L=48,R=14,T=12,B=26,n=diffs.length;
+  const mx=niceMax(Math.max(...diffs.filter(v=>v!=null).map(Math.abs),1)), mid=(T+h-B)/2, half=(h-B-T)/2, bw=(w-L-R)/n, y=v=>mid-v/mx*half;
+  const xl=(i)=>[1,8,15,22,n].includes(i+1)?`<text x="${L+bw*(i+.5)}" y="${h-6}" text-anchor="middle">${i+1}</text>`:'';
+  return `<svg class="chart" data-cid="${reg({mode:'bar',w,h,L,R,T,B,max:mx,n,labels:tips||diffs.map((_,i)=>'Day '+(i+1)),fmt:tipFmt||fmt,series:[{name:'Difference',color:'#e8642c',vals:diffs}]})}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${aria}">
+   ${[mx,0,-mx].map(t=>`<line x1="${L}" x2="${w-R}" y1="${y(t)}" y2="${y(t)}" stroke="rgba(255,255,255,${t?0.08:0.25})"/><text x="${L-8}" y="${y(t)+4}" text-anchor="end">${t>0?'+':t<0?'−':''}${fmt(Math.abs(t))}</text>`).join('')}
+   ${diffs.map((v,i)=>v==null?'':`<rect class="dv" x="${L+bw*i+bw*.15}" width="${bw*.7}" y="${Math.min(y(v),y(0))}" height="${Math.max(Math.abs(y(v)-y(0)),1)}" rx="2" fill="${v>=0?'#4cc38a':'#ef5b5b'}"/>`+xl(i)).join('')}</svg>`;
+}
+
+const mxf=(ds,k)=>Math.max(...ds.map(x=>x[k])), mnf=(ds,k)=>Math.min(...ds.map(x=>x[k]));
+function narrative(A,B,la,lb){
+  const sg=v=>v>=0?'+':'−', ab=Math.abs, pc=(x,y)=>y?(x/y-1)*100:0;
+  const d=B.total-A.total, ca=A.total/A.guests, cb=B.total/B.guests;
+  const gE=(B.guests-A.guests)*ca, cE=d-gE;
+  const lead=`<b>${lb}</b> sales ${d>=0?'rose':'fell'} <b>${ab(pc(B.total,A.total)).toFixed(1)}%</b> (${sg(d)}${f(ab(d))} EGP) compared with ${la}.`;
+  const main=ab(gE)>=ab(cE)?'guest numbers':'average check';
+  const l2=`Guests ${B.guests>=A.guests?'rose':'fell'} ${ab(pc(B.guests,A.guests)).toFixed(1)}%, which ${gE>=0?'added':'cost'} about ${f(ab(gE))} EGP. Average check ${cb>=ca?'rose':'fell'} ${ab(pc(cb,ca)).toFixed(1)}% (${f(ca)} to ${f(cb)} EGP), which ${cE>=0?'added':'cost'} about ${f(ab(cE))} EGP. The bigger driver was <b>${main}</b>.`;
+  let l3='';
+  if(A.visa!=null&&B.visa!=null){
+    l3=[['Visa',A.visa,B.visa],['Cash',A.cash,B.cash],...(A.insta!=null&&B.insta!=null?[['Instapay',A.insta,B.insta]]:[])].map(([n,a,b])=>`${n} ${b>=a?'rose':'fell'} ${ab(pc(b,a)).toFixed(1)}% (${sg(b-a)}${f(ab(b-a))} EGP)`).join(', ')+'.';
+    const ga=gapOf(A),gb=gapOf(B); l3+=` Sales not itemised went ${gb>=ga?'up':'down'} from ${f(ga)} to ${f(gb)} EGP.`;
+  }
+  return `<p class="story">${lead}</p><p class="story">${l2}</p>${l3?`<p class="story">${l3}</p>`:''}`;
+}
+function weekdayTable(dsA,dsB,la,lb){
+  const calc=(ds)=>{const o=WK.map(()=>({t:0,g:0,n:0}));ds.forEach(x=>{const k=o[wkIdx(x.wd)];k.t+=x.total;k.g+=x.guests;k.n++});return o};
+  const a=calc(dsA), b=calc(dsB);
+  const cell=(x,k)=>x.n?f(x[k]/x.n):'—';
+  const ch=(x,y,k)=>x.n&&y.n?yoyTxt(y[k]/y.n,x[k]/x.n):'<span class="sub">—</span>';
+  return `<div class="card glass s12"><h2>By weekday</h2><div class="sub">Average per day for each weekday, so months with different weekday counts compare fairly.</div><div class="tablewrap"><table><thead><tr><th>Weekday</th><th>Days</th><th>Sales ${la}</th><th>Sales ${lb}</th><th>Change</th><th>Guests ${la}</th><th>Guests ${lb}</th><th>Change</th></tr></thead><tbody>
+  ${WK.map((n,i)=>`<tr><td>${n}</td><td>${a[i].n} / ${b[i].n}</td><td>${cell(a[i],'t')}</td><td>${cell(b[i],'t')}</td><td>${ch(a[i],b[i],'t')}</td><td>${cell(a[i],'g')}</td><td>${cell(b[i],'g')}</td><td>${ch(a[i],b[i],'g')}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+function headToHead(m,ya,yb,mode){
+  const M=monthRec(yb,m), p=monthRec(ya,m); if(!M||!p) return '';
+  const dc=daysOf(yb,m), dp=daysOf(ya,m), mon=MN[m-1], cy=yb, py=ya;
+  let pairs;
+  if(mode==='weekday'){
+    const byW={}; dp.forEach(x=>(byW[x.wd]=byW[x.wd]||[]).push(x)); const used={};
+    pairs=dc.map(b=>{const k=used[b.wd]||0; used[b.wd]=k+1; return {a:(byW[b.wd]||[])[k]||null,b}});
+  } else pairs=dc.map(b=>({a:dp.find(z=>z.d===b.d)||null,b}));
+  const n=pairs.length;
+  const xl=pairs.map(q=>[1,8,15,22,n].includes(q.b.d)?String(q.b.d):'');
+  const tips=pairs.map(q=>`${dayName(q.b)} ${mon} ${cy}`+(q.a?` vs ${dayName(q.a)} ${mon} ${py}`:''));
+  const pair=(title,a,b,fm,unit)=>{const mx=Math.max(a,b),d=b-a,s=d>=0?'+':'−';
+    return `<div class="card glass s4"><h2>${title}</h2><div class="sub">${mon} ${py} vs ${mon} ${cy}</div><div class="bars">${[[py,a],[cy,b]].map(([yy,v])=>`<div><div class="row"><span>${yy}</span><span>${fm(v)}${unit}</span></div><div class="track"><div class="fill" style="width:${v/mx*100}%;background:${YC[yy]||'#e8642c'}"></div></div></div>`).join('')}</div><p class="gap ${d>=0?'up':'down'}">${s}${fm(Math.abs(d))}${unit}<small>${s}${Math.abs(d/a*100).toFixed(1)}%</small></p></div>`};
+  const sd=fld=>pairs.map(q=>q.a?q.b[fld]-q.a[fld]:null);
+  const ov=(fld,fmt,aria)=>lineChart({series:[{name:`${mon} ${py}`,color:YC[py]||'#9a948b',data:pairs.map(q=>q.a?q.a[fld]:null)},{name:`${mon} ${cy}`,color:YC[cy]||'#e8642c',data:pairs.map(q=>q.b[fld])}],xlabels:xl,fmt,aria,tips,tipFmt:fld==='total'?(v=>f(v)+' EGP'):(v=>f(v))});
+  const how=mode==='weekday'?'Matched by weekday: the 1st Friday against the 1st Friday, and so on.':'Matched by date: the 16th against the 16th, so weekdays can differ.';
+  return `${pair('Sales',p.total,M.total,v=>(v/1e6).toFixed(2)+'M',' EGP')}
+  ${pair('Guests',p.guests,M.guests,v=>f(v),'')}
+  ${pair('Average check',p.total/p.guests,M.total/M.guests,v=>f(v),' EGP')}
+  <div class="card glass s6"><h2>Daily sales, side by side</h2><div class="sub">${how}</div>${ov('total',short,'Daily sales this year and last year')}</div>
+  <div class="card glass s6"><h2>Daily guests, side by side</h2><div class="sub">${how}</div>${ov('guests',v=>f(v),'Daily guests this year and last year')}</div>
+  <div class="card glass s6"><h2>Sales gained or lost per day</h2><div class="sub">${mon} ${cy} minus ${mon} ${py}, EGP. Green is up, red is down.</div>${divBars(sd('total'),short,'Daily sales difference',tips,v=>(v>=0?'+':'−')+f(Math.abs(v))+' EGP')}</div>
+  <div class="card glass s6"><h2>Guests gained or lost per day</h2><div class="sub">${mon} ${cy} minus ${mon} ${py}. Green is up, red is down.</div>${divBars(sd('guests'),v=>f(v),'Daily guests difference',tips,v=>(v>=0?'+':'−')+f(Math.abs(v)))}</div>
+  ${weekdayTable(dp,dc,`${mon} ${py}`,`${mon} ${cy}`)}`;
+}
+
+/* ---------- custom periods ---------- */
+const dk=x=>x.y*10000+x.m*100+x.d;
+const kToDate=k=>new Date(Date.UTC(Math.floor(k/10000),Math.floor(k/100)%100-1,k%100));
+const dateToK=d=>d.getUTCFullYear()*10000+(d.getUTCMonth()+1)*100+d.getUTCDate();
+const addD=(k,n)=>{const d=kToDate(k);d.setUTCDate(d.getUTCDate()+n);return dateToK(d)};
+const shiftY=k=>{const d=kToDate(k);d.setUTCFullYear(d.getUTCFullYear()-1);return dateToK(d)};
+const kIso=k=>`${Math.floor(k/10000)}-${String(Math.floor(k/100)%100).padStart(2,'0')}-${String(k%100).padStart(2,'0')}`;
+const isoK=s=>+s.replace(/-/g,'');
+const kLabel=k=>`${k%100} ${MN[Math.floor(k/100)%100-1]} ${Math.floor(k/10000)}`;
+const firstK=dk(days[0]), lastK=dk(days[days.length-1]);
+const lastN=n=>{const be=lastK,bs=addD(be,-(n-1)),ae=addD(bs,-1),as=addD(ae,-(n-1));return {as,ae,bs,be}};
+const PRE={last7:()=>lastN(7),last30:()=>lastN(30),lastyear:()=>({as:shiftY(per.bs),ae:shiftY(per.be),bs:per.bs,be:per.be}),ramadan:()=>({as:20250301,ae:20250330,bs:20260218,be:20260319})};
+const per=lastN(7);
+function rowsTable(R,la,lb,note){
+  const sg=v=>v>=0?'+':'−';
+  const chg=r=>{const d=r[2]-r[1];return {d,p:r[1]?(r[2]/r[1]-1)*100:0,good:d>=0}};
+  return `<div class="card glass s12"><h2>All the numbers</h2><div class="sub">${note}</div><div class="tablewrap"><table><thead><tr><th>Measure</th><th>${la}</th><th>${lb}</th><th>Change</th><th>Change %</th></tr></thead><tbody>${R.map(r=>{const c=chg(r);const cl=c.good?'up':'down';return `<tr><td>${r[0]}</td><td>${r[3](r[1])}${r[4]}</td><td>${r[3](r[2])}${r[4]}</td><td><span class="delta ${cl}">${c.d>=0?'▲':'▼'} ${sg(c.d)}${r[3](Math.abs(c.d))}${r[4]}</span></td><td><span class="delta ${cl}">${sg(c.p)}${Math.abs(c.p).toFixed(1)}%</span></td></tr>`}).join('')}</tbody></table></div></div>`;
+}
+/* ---------- pages ---------- */
+/*INS*/
+function insights(months,days,sel){
+  const M=months[sel], out=[], ab=Math.abs, sg=v=>v>=0?'+':'−', mon=MN[M.m-1];
+  const rec=(y,m)=>months[idxOf[key(y,m)]], pc=(a,b)=>(a/b-1)*100;
+  const Y=rec(M.y-1,M.m);
+  if(Y){
+    const d=M.total-Y.total, gE=(M.guests-Y.guests)*(Y.total/Y.guests), cE=d-gE;
+    out.push([d>=0?'good':'bad',`Vs ${mon} ${Y.y}`,`Sales ${sg(d)}${ab(pc(M.total,Y.total)).toFixed(1)}%`,
+      `${ab(gE)>=ab(cE)?'Mostly guests':'Mostly average check'}: guests ${sg(M.guests-Y.guests)}${ab(pc(M.guests,Y.guests)).toFixed(1)}%, average check ${sg(M.total/M.guests-Y.total/Y.guests)}${ab(pc(M.total/M.guests,Y.total/Y.guests)).toFixed(1)}%.`]);
+  }
+  const cur=months.filter(r=>r.y===M.y&&r.m<=M.m), prv=months.filter(r=>r.y===M.y-1&&r.m<=M.m), sum=a=>a.reduce((t,r)=>t+r.total,0);
+  if(cur.length>1&&prv.length===cur.length)
+    out.push([sum(cur)>=sum(prv)?'good':'bad',`${M.y} so far`,`Year to date ${sg(sum(cur)-sum(prv))}${ab(pc(sum(cur),sum(prv))).toFixed(1)}%`,`${short(sum(cur))} vs ${short(sum(prv))} EGP, Jan to ${mon}.`]);
+  let n=0,dir=null;
+  for(let i=sel;i>=0;i--){const r=months[i],y=rec(r.y-1,r.m); if(!y) break; const up=r.total>=y.total; if(dir===null) dir=up; if(up!==dir) break; n++;}
+  if(n>=2) out.push([dir?'good':'bad','Momentum',`${n} months in a row ${dir?'above':'below'} last year`,`Sales, same month compared, up to ${mon} ${M.y}.`]);
+  const rank=months.filter(r=>r.total>M.total).length+1, N=months.length;
+  out.push([rank<=3?'good':rank>N-3?'bad':'info','Rank',`#${rank} of ${N} months`,`${mon} ${M.y} sales compared with every month since ${MN[months[0].m-1]} ${months[0].y}.`]);
+  const by={}; days.filter(x=>x.y===M.y&&x.m===M.m).forEach(x=>(by[x.wd]=by[x.wd]||[]).push(x.total));
+  const av=Object.keys(by).map(k=>[+k,by[k].reduce((a,b)=>a+b,0)/by[k].length]).sort((a,b)=>b[1]-a[1]);
+  if(av.length>1) out.push(['info','Weekdays',`${WK[wkIdx(av[0][0])]} is the strongest day`,`Average ${f(av[0][1])} EGP, against ${f(av[av.length-1][1])} on ${WK[wkIdx(av[av.length-1][0])]}.`]);
+  if(Y&&M.cash!=null&&Y.cash!=null){const a=pct(M.cash,M.total),b=pct(Y.cash,Y.total);
+    out.push(['info','Payments',`Cash is ${a.toFixed(1)}% of sales`,`${sg(a-b)}${ab(a-b).toFixed(1)} points vs ${mon} ${Y.y}.`]);}
+  return out;
+}
+/*/INS*/
+const pages = {
+ overview:{title:'Overview', html(){
+  const M=months[sel], P=months[sel-1], ds=daysOf(M.y,M.m), best=ds.reduce((a,b)=>b.total>a.total?b:a), worst=ds.reduce((a,b)=>b.total<a.total?b:a);
+  const gp=pct(gapOf(M),M.total), ch=M.total/M.guests;
+  const items=[
+   [P&&M.total>=P.total?'good':'bad', P?`Sales ${M.total>=P.total?'up':'down'} ${Math.abs((M.total/P.total-1)*100).toFixed(1)}%`:'Sales baseline month', P?`${short(M.total)} vs ${short(P.total)} EGP last month`:'No earlier month to compare', P&&M.total>=P.total?'Good':'Watch'],
+   [gp>3?'warn':'good', `${gp.toFixed(1)}% of sales not itemised`, `${f(gapOf(M))} EGP is not in Visa, Cash or Instapay`, gp>3?'Check':'OK'],
+   ['warn', `Weakest day: ${dayName(worst)}`, `${f(worst.total)} EGP, ${worst.guests} guests`, 'Low']];
+  const col=c=>({good:'var(--good)',bad:'var(--bad)',warn:'var(--warn)'}[c]);
+  return `
+  ${kpi('Sales',(M.total/1e6).toFixed(2)+'M',delta(M.total,P&&P.total),`data-count="${(M.total/1e6).toFixed(2)}" data-dec="2" data-suf="M"`)}
+  ${kpi('Guests',f(M.guests),delta(M.guests,P&&P.guests),`data-count="${M.guests}"`)}
+  ${kpi('Average check',f(ch)+' EGP',delta(ch,P&&P.total/P.guests),`data-count="${Math.round(ch)}" data-suf=" EGP"`)}
+  ${kpi('Best day',short(best.total),`<span class="sub">${dayName(best)}, ${best.guests} guests</span>`)}
+  ${(()=>{const c={good:'var(--good)',bad:'var(--bad)',warn:'var(--warn)',info:'var(--muted)'};return `<div class="card glass s12"><h2>Key insights</h2><div class="sub">${lbl(M)}, worked out from your data</div><div class="insg">${insights(months,days,sel).map(([t,l,h,x])=>`<div class="ins" style="border-left-color:${c[t]}"><small>${l}</small><b>${h}</b><p>${x}</p></div>`).join('')}</div></div>`})()}
+  ${P?`<div class="card glass s12"><h2>In short</h2><div class="sub">${lbl(M)} against ${lbl(P)}</div>${narrative(P,M,lbl(P),lbl(M))}</div>`:''}
+  <div class="card glass s8"><h2>Daily sales</h2><div class="sub">${lbl(M)}, EGP</div>${lineChart({series:[{name:'Sales',data:ds.map(x=>x.total),color:'#e8642c'}],xlabels:ds.map(x=>[1,8,15,22,ds.length].includes(x.d)?String(x.d):''),aria:'Daily sales',tips:ds.map(x=>dayName(x)+' '+MN[M.m-1]),tipFmt:v=>f(v)+' EGP'})}</div>
+  <div class="card glass s4"><h2>Needs attention</h2><div class="sub">${lbl(M)}</div><div class="list">${items.map(([c,t,s,p])=>`<div class="item"><span class="dot" style="background:${col(c)}"></span><p>${t}<small>${s}</small></p><span class="pill ${c}">${p}</span></div>`).join('')}</div></div>
+  <div class="card glass s5"><h2>Payment mix</h2><div class="sub">Share of sales</div>${bars([['Visa',pct(M.visa,M.total),'w',pct(M.visa,M.total).toFixed(1)+'%'],['Cash',pct(M.cash,M.total),'',pct(M.cash,M.total).toFixed(1)+'%'],...instaBar(M),['Not itemised',gp,'b',gp.toFixed(1)+'%']])}</div>
+  <div class="card glass s7"><h2>Average sales by weekday</h2><div class="sub">${lbl(M)}, EGP</div>${weekdayCols(ds,'total')}</div>`; }},
+ sales:{title:'Sales', html(){
+  const M=months[sel], ds=daysOf(M.y,M.m), top=[...ds].sort((a,b)=>b.total-a.total).slice(0,5), last=ds.slice(-7).reverse();
+  const yrs=[2024,2025,2026], cl={2024:'#9a948b',2025:'#f0b445',2026:'#e8642c'};
+  return `
+  <div class="card glass s12"><h2>Sales by month</h2><div class="sub">Year over year, EGP</div>${lineChart({series:yrs.map(y=>({name:String(y),color:cl[y],data:MN.map((_,i)=>{const k=idxOf[key(y,i+1)];return k==null?null:months[k].total})})),xlabels:MN,aria:'Monthly sales by year',h:260,tipFmt:v=>f(v)+' EGP'})}</div>
+  <div class="card glass s5"><h2>Top 5 days</h2><div class="sub">${lbl(M)}</div><div class="list">${top.map((x,i)=>`<div class="item"><span class="pill">${i+1}</span><p>${dayName(x)}<small>${x.guests} guests</small></p><b>${f(x.total)}</b></div>`).join('')}</div></div>
+  <div class="card glass s7"><h2>Last 7 days of the month</h2><div class="sub">Sales, guests and average check</div><div class="tablewrap"><table><thead><tr><th>Day</th><th>Sales</th><th>Guests</th><th>Avg check</th></tr></thead><tbody>${last.map(x=>`<tr><td>${dayName(x)}</td><td>${f(x.total)}</td><td>${x.guests}</td><td>${f(x.total/x.guests)}</td></tr>`).join('')}</tbody></table></div></div>`; }},
+ guests:{title:'Guests', html(){
+  const M=months[sel], P=months[sel-1], ds=daysOf(M.y,M.m), busy=ds.reduce((a,b)=>b.guests>a.guests?b:a);
+  return `
+  ${kpi('Guests',f(M.guests),delta(M.guests,P&&P.guests),`data-count="${M.guests}"`)}
+  ${kpi('Guests per day',f(M.guests/ds.length),`<span class="sub">${ds.length} days</span>`,`data-count="${Math.round(M.guests/ds.length)}"`)}
+  ${kpi('Busiest day',String(busy.guests),`<span class="sub">${dayName(busy)}</span>`)}
+  ${kpi('Average check',f(M.total/M.guests)+' EGP',delta(M.total/M.guests,P&&P.total/P.guests),`data-count="${Math.round(M.total/M.guests)}" data-suf=" EGP"`)}
+  <div class="card glass s6"><h2>Guests by month</h2><div class="sub">2024 to now</div>${lineChart({series:[{name:'Guests',data:months.map(r=>r.guests),color:'#e8642c'}],xlabels:mLabels,aria:'Guests by month',tips:months.map(lbl)})}</div>
+  <div class="card glass s6"><h2>Average check by month</h2><div class="sub">EGP per guest</div>${lineChart({series:[{name:'Avg check',data:months.map(r=>r.total/r.guests),color:'#4cc38a'}],xlabels:mLabels,aria:'Average check by month',tips:months.map(lbl),tipFmt:v=>f(v)+' EGP'})}</div>
+  <div class="card glass s12"><h2>Average guests by weekday</h2><div class="sub">${lbl(M)}</div>${weekdayCols(ds,'guests')}</div>`; }},
+
+ compare:{title:'Compare years', html(){
+  normCmp();
+  const yrs=YRS.filter(y=>monthRec(y,cmp.m)), mon=MN[cmp.m-1], ya=cmp.a, yb=cmp.b;
+  const opt=(arr,v,lab)=>arr.map(x=>`<option value="${x}"${x===v?' selected':''}>${lab?lab(x):x}</option>`).join('');
+  const controls=`<div class="card glass s12"><div class="cmpbar"><label for="cm">Month</label><select id="cm" data-cmp="m">${opt(MN.map((_,i)=>i+1).filter(m=>YRS.filter(y=>monthRec(y,m)).length>1),cmp.m,m=>MN[m-1])}</select><label for="ca">Compare</label><select id="ca" data-cmp="a">${opt(yrs,ya)}</select><label for="cb">with</label><select id="cb" data-cmp="b">${opt(yrs,yb)}</select><label for="cmode">Match days by</label><select id="cmode" data-cmp="mode"><option value="date"${cmp.mode==='date'?' selected':''}>Date</option><option value="weekday"${cmp.mode==='weekday'?' selected':''}>Weekday</option></select></div></div>`;
+  if(ya===yb) return controls+`<div class="card glass s12"><h2>Pick two different years</h2><div class="sub">${mon} has data in only one year.</div></div>`;
+  const ra=monthRec(ya,cmp.m), rb=monthRec(yb,cmp.m), da=daysOf(ya,cmp.m), db=daysOf(yb,cmp.m);
+  const mxf=(ds,k)=>Math.max(...ds.map(x=>x[k])), mnf=(ds,k)=>Math.min(...ds.map(x=>x[k]));
+  const eg=v=>f(v), ep=v=>f(v);
+  const R=[ // name, a, b, formatter, unit, invert (rise is bad), share
+   ['Sales',ra.total,rb.total,f,' EGP'],['Guests',ra.guests,rb.guests,f,''],['Average check',ra.total/ra.guests,rb.total/rb.guests,f,' EGP'],
+   ['Sales per day',ra.total/da.length,rb.total/db.length,f,' EGP'],['Guests per day',ra.guests/da.length,rb.guests/db.length,f,''],
+   ['Best day sales',mxf(da,'total'),mxf(db,'total'),f,' EGP'],['Weakest day sales',mnf(da,'total'),mnf(db,'total'),f,' EGP'],
+   ['Best day guests',mxf(da,'guests'),mxf(db,'guests'),f,''],
+   ['Visa',ra.visa,rb.visa,f,' EGP'],['Cash',ra.cash,rb.cash,f,' EGP'],...(ra.insta!=null&&rb.insta!=null?[['Instapay',ra.insta,rb.insta,f,' EGP']]:[]),['Not itemised',gapOf(ra),gapOf(rb),f,' EGP',1],
+   ['Visa share of sales',pct(ra.visa,ra.total),pct(rb.visa,rb.total),v=>v.toFixed(1),'%',0,1],['Cash share of sales',pct(ra.cash,ra.total),pct(rb.cash,rb.total),v=>v.toFixed(1),'%',0,1]];
+  const chg=r=>{const d=r[2]-r[1]; return {d,p:r[6]?null:(r[1]?(r[2]/r[1]-1)*100:0),good:r[5]?d<=0:d>=0}};
+  const sg=v=>v>=0?'+':'−';
+  const cellD=(r)=>{const c=chg(r),fm=r[3];return `<span class="delta ${c.good?'up':'down'}">${c.d>=0?'▲':'▼'} ${sg(c.d)}${fm(Math.abs(c.d))}${r[4]}</span>`};
+  const cellP=(r)=>{const c=chg(r);return c.p==null?`<span class="delta ${c.good?'up':'down'}">${sg(c.d)}${Math.abs(c.d).toFixed(1)} pts</span>`:`<span class="delta ${c.good?'up':'down'}">${sg(c.p)}${Math.abs(c.p).toFixed(1)}%</span>`};
+  const main=R.filter(r=>!r[6]);
+  const rose=main.filter(r=>r[2]>r[1]).sort((x,y)=>chg(y).p-chg(x).p), fell=main.filter(r=>r[2]<r[1]).sort((x,y)=>chg(x).p-chg(y).p);
+  const li=(r,c)=>`<div class="item"><span class="dot" style="background:var(--${c})"></span><p>${r[0]}<small>${r[3](r[1])} → ${r[3](r[2])}${r[4]}</small></p><b class="delta ${c==='good'?'up':'down'}">${sg(chg(r).p)}${Math.abs(chg(r).p).toFixed(1)}%</b></div>`;
+  const side=(arr,title,c)=>`<div class="card glass s6"><h2>${title}</h2><div class="sub">${mon} ${yb} compared with ${mon} ${ya}</div><div class="list">${arr.length?arr.map(r=>li(r,r[5]?(c==='good'?'bad':'good'):c)).join(''):'<div class="item"><p>Nothing here</p></div>'}</div></div>`;
+  const table=`<div class="card glass s12"><h2>All the numbers</h2><div class="sub">${mon} ${yb} compared with ${mon} ${ya}. Green is better, red is worse. Not itemised going up counts as worse. Instapay is only recorded from ${firstInsta}.</div><div class="tablewrap"><table><thead><tr><th>Measure</th><th>${mon} ${ya}</th><th>${mon} ${yb}</th><th>Change</th><th>Change %</th></tr></thead><tbody>${R.map(r=>`<tr><td>${r[0]}</td><td>${r[3](r[1])}${r[4]}</td><td>${r[3](r[2])}${r[4]}</td><td>${cellD(r)}</td><td>${cellP(r)}</td></tr>`).join('')}</tbody></table></div></div>`;
+  const X=METRICS[metric], mv=r=>r?X.val(r):null;
+  const seg=`<div class="seg" role="group" aria-label="Metric">${Object.keys(METRICS).map(k=>`<button type="button" data-metric="${k}" aria-pressed="${k===metric}">${METRICS[k].name}</button>`).join('')}</div>`;
+  const rows=MN.map((n,i)=>{const v=YRS.map(y=>mv(monthRec(y,i+1)));const c=(a,b)=>a!=null&&b?yoyTxt(a,b):'<span class="sub">—</span>';
+    return `<tr class="${i+1===cmp.m?'sel':''}"><td>${n}</td>${v.map(x=>`<td>${x==null?'—':f(x)}</td>`).join('')}<td>${c(v[1],v[0])}</td><td>${c(v[2],v[1])}</td></tr>`}).join('');
+  return `${controls}<div class="card glass s12"><h2>In short</h2><div class="sub">${mon} ${yb} compared with ${mon} ${ya}</div>${narrative(ra,rb,mon+' '+ya,mon+' '+yb)}</div>${side(rose,'What went up','good')}${side(fell,'What went down','bad')}${table}${headToHead(cmp.m,ya,yb,cmp.mode)}
+  <div class="card glass s12"><h2>${X.name} across the year</h2><div class="sub">Each line is one year</div>${seg}${lineChart({series:YRS.map(y=>({name:String(y),color:YC[y],data:MN.map((_,i)=>mv(monthRec(y,i+1)))})),xlabels:MN,fmt:X.fmt,aria:X.name+' by month and year',tipFmt:v=>f(v)+(X.unit?' '+X.unit:'')})}</div>
+  <div class="card glass s12"><h2>Every month, every year</h2><div class="sub">${X.name}${X.unit?', '+X.unit:''}. ${mon} is highlighted.</div><div class="tablewrap"><table><thead><tr><th>Month</th>${YRS.map(y=>`<th>${y}</th>`).join('')}<th>2025 vs 2024</th><th>2026 vs 2025</th></tr></thead><tbody>${rows}</tbody></table></div></div>`; }},
+ periods:{title:'Custom periods', html(){
+  const mk=(s,e)=>{const ds=days.filter(x=>{const k=dk(x);return k>=s&&k<=e});return ds.length?{ds,total:ds.reduce((a,x)=>a+x.total,0),guests:ds.reduce((a,x)=>a+x.guests,0)}:null};
+  const A=mk(per.as,per.ae), B=mk(per.bs,per.be);
+  const inp=(id,key,label)=>`<label for="${id}">${label}</label><input type="date" id="${id}" data-per="${key}" value="${kIso(per[key])}" min="${kIso(firstK)}" max="${kIso(lastK)}">`;
+  const pre=[['last7','Last 7 days vs the 7 before'],['last30','Last 30 days vs the 30 before'],['lastyear','Period B vs the same dates last year'],['ramadan','Ramadan 2026 vs 2025']];
+  const controls=`<div class="card glass s12"><div class="cmpbar">${inp('pa1','as','Period A from')}${inp('pa2','ae','to')}${inp('pb1','bs','Period B from')}${inp('pb2','be','to')}</div><div class="seg" style="margin:14px 0 0;flex-wrap:wrap" role="group" aria-label="Quick choices">${pre.map(([k,n])=>`<button type="button" data-preset="${k}" aria-pressed="false">${n}</button>`).join('')}</div><p class="note">Period A is the base and Period B is compared against it. Ramadan dates are approximate and can be off by a day.</p></div>`;
+  if(!A||!B||per.ae<per.as||per.be<per.bs) return controls+`<div class="card glass s12"><h2>No data for these dates</h2><div class="sub">Pick dates between ${kLabel(firstK)} and ${kLabel(lastK)}, with each start before its end.</div></div>`;
+  const nA=A.ds.length, nB=B.ds.length, la='Period A', lb='Period B';
+  const R=[['Sales',A.total,B.total,f,' EGP'],['Guests',A.guests,B.guests,f,''],['Average check',A.total/A.guests,B.total/B.guests,f,' EGP'],['Sales per day',A.total/nA,B.total/nB,f,' EGP'],['Guests per day',A.guests/nA,B.guests/nB,f,''],['Best day sales',mxf(A.ds,'total'),mxf(B.ds,'total'),f,' EGP'],['Weakest day sales',mnf(A.ds,'total'),mnf(B.ds,'total'),f,' EGP'],['Best day guests',mxf(A.ds,'guests'),mxf(B.ds,'guests'),f,'']];
+  const n=Math.max(nA,nB);
+  const tips=Array.from({length:n},(_,i)=>`Day ${i+1}`+(A.ds[i]?`, A: ${dayName(A.ds[i])} ${MN[A.ds[i].m-1]}`:'')+(B.ds[i]?`, B: ${dayName(B.ds[i])} ${MN[B.ds[i].m-1]}`:''));
+  const xl=Array.from({length:n},(_,i)=>[1,8,15,22,29,n].includes(i+1)&&n>7||n<=7?String(i+1):'');
+  const ov=(fld,fmt,aria,unit)=>lineChart({series:[{name:`A: ${kLabel(per.as)} to ${kLabel(per.ae)}`,color:'#f0b445',data:Array.from({length:n},(_,i)=>A.ds[i]?A.ds[i][fld]:null)},{name:`B: ${kLabel(per.bs)} to ${kLabel(per.be)}`,color:'#e8642c',data:Array.from({length:n},(_,i)=>B.ds[i]?B.ds[i][fld]:null)}],xlabels:xl,fmt,aria,tips,tipFmt:v=>f(v)+unit});
+  const lenNote=nA!==nB?`<p class="note">Period A has ${nA} days and Period B has ${nB}, so compare the per-day rows, not the totals.</p>`:'';
+  return `${controls}
+  <div class="card glass s12"><h2>In short</h2><div class="sub">A: ${kLabel(per.as)} to ${kLabel(per.ae)} (${nA} days). B: ${kLabel(per.bs)} to ${kLabel(per.be)} (${nB} days).</div>${narrative(A,B,la,lb)}${lenNote}</div>
+  ${rowsTable(R,la,lb,'Green is better, red is worse.')}
+  <div class="card glass s6"><h2>Daily sales</h2><div class="sub">Day 1 of each period lined up</div>${ov('total',short,'Daily sales in both periods',' EGP')}</div>
+  <div class="card glass s6"><h2>Daily guests</h2><div class="sub">Day 1 of each period lined up</div>${ov('guests',v=>f(v),'Daily guests in both periods','')}</div>
+  ${weekdayTable(A.ds,B.ds,la,lb)}`; }},
+ payments:{title:'Payments', html(){
+  const M=months[sel], gp=pct(gapOf(M),M.total);
+  return `
+  <div class="card glass s6"><h2>Cash share</h2><div class="sub">Cash as % of sales</div>${lineChart({series:[{name:'Cash',data:months.map(r=>r.part?null:pct(r.cash,r.total)),color:'#f0b445'}],xlabels:mLabels,fmt:v=>v.toFixed(0)+'%',aria:'Cash share by month',tips:months.map(lbl),tipFmt:v=>v.toFixed(1)+'%'})}</div>
+  <div class="card glass s6"><h2>Not itemised</h2><div class="sub">Sales minus Visa, Cash and Instapay, % of sales</div>${lineChart({series:[{name:'Not itemised',data:months.map(r=>r.part?null:pct(gapOf(r),r.total)),color:'#ef5b5b'}],xlabels:mLabels,fmt:v=>v.toFixed(0)+'%',aria:'Not itemised share by month',tips:months.map(lbl),tipFmt:v=>v.toFixed(1)+'%'})}</div>
+  <div class="card glass s12"><h2>Instapay share</h2><div class="sub">Instapay as % of sales, from ${firstInsta}</div>${lineChart({series:[{name:'Instapay',data:months.map(r=>r.insta==null||r.part?null:pct(r.insta,r.total)),color:'#4cc38a'}],xlabels:mLabels,fmt:v=>v.toFixed(0)+'%',aria:'Instapay share by month',tips:months.map(lbl),tipFmt:v=>v.toFixed(1)+'%'})}</div>
+  <div class="card glass s12"><h2>${lbl(M)} breakdown</h2><div class="sub">Total ${f(M.total)} EGP</div>${bars([['Visa',pct(M.visa,M.total),'w',f(M.visa)+' EGP · '+pct(M.visa,M.total).toFixed(1)+'%'],['Cash',pct(M.cash,M.total),'',f(M.cash)+' EGP · '+pct(M.cash,M.total).toFixed(1)+'%'],...instaBar(M,1),['Not itemised',gp,'b',f(gapOf(M))+' EGP · '+gp.toFixed(1)+'%']])}<p class="note">Instapay is recorded from ${firstInsta}. Before that it sits inside Not itemised.</p></div>`; }}
+};
+const icons = {
+  overview:'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  sales:'<path d="M3 17l5-5 4 4 8-9M15 7h5v5"/>',
+  guests:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.5-4 3-6 6.5-6s6 2 6.5 6M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2.2.6 3.2 2.5 3.5 6"/>',
+  compare:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  periods:'<rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  payments:'<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M7 15h3"/>'
+};
+const nav=document.getElementById('nav'), view=document.getElementById('view'), monthSel=document.getElementById('month');
+nav.innerHTML=Object.keys(pages).map(k=>`<a href="#${k}" data-k="${k}"><svg viewBox="0 0 24 24" aria-hidden="true">${icons[k]}</svg>${pages[k].title}</a>`).join('');
+monthSel.innerHTML=months.map((r,i)=>`<option value="${i}">${lbl(r)}</option>`).reverse().join('');
+monthSel.value=String(sel);
+const last=months[months.length-1];
+document.getElementById('foot').textContent=short(months.filter(r=>r.y===last.y).reduce((a,r)=>a+r.total,0))+' EGP';
+{const ld=days[days.length-1]; document.getElementById('date').textContent='Real data through '+ld.d+' '+MN[ld.m-1]+' '+ld.y;}
+
+/* ---------- motion: cards land in reading order ---------- */
+function landCards(cards,{y=26,stagger=.06,delay=0}={}){
+  if(reduce||!window.gsap||!cards.length) return;
+  const tl=gsap.timeline({delay});
+  tl.fromTo(cards,{opacity:0,y,scale:.985},{opacity:1,y:0,scale:1,duration:.8,ease:'expo.out',stagger,clearProps:'transform,opacity'});
+  const q=s=>view.querySelectorAll(s);
+  q('[data-count]').forEach(el=>{
+    const to=+el.dataset.count,dec=+el.dataset.dec||0,suf=el.dataset.suf||'',o={v:0};
+    gsap.to(o,{v:to,duration:1.3,delay:delay+.15,ease:'power3.out',onUpdate:()=>{el.textContent=o.v.toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec})+suf}});
+  });
+  if(q('.draw').length) gsap.fromTo(q('.draw'),{strokeDasharray:1,strokeDashoffset:1},{strokeDashoffset:0,duration:1.4,delay:delay+.3,ease:'power2.inOut',clearProps:'strokeDasharray,strokeDashoffset'});
+  if(q('.dv').length) gsap.from(q('.dv'),{opacity:0,duration:.5,delay:delay+.4,stagger:.015});
+  if(q('.area').length) gsap.from(q('.area'),{opacity:0,duration:1,delay:delay+.9});
+  if(q('.fill').length) gsap.from(q('.fill'),{scaleX:0,transformOrigin:'0 50%',duration:1,delay:delay+.35,ease:'expo.out',stagger:.08,clearProps:'transform'});
+  if(q('.bar').length) gsap.from(q('.bar'),{scaleY:0,transformOrigin:'50% 100%',duration:.9,delay:delay+.3,ease:'expo.out',stagger:.04,clearProps:'transform'});
+  q('.rg').forEach(c=>{const da=c.getAttribute('stroke-dasharray');gsap.fromTo(c,{strokeDasharray:'0 999'},{strokeDasharray:da,duration:1.3,delay:delay+.3,ease:'expo.out'})});
+}
+
+/* ---------- chart tooltips: hover on desktop, touch and drag on phone ---------- */
+const tip=document.createElement('div'); tip.id='tip'; document.body.appendChild(tip);
+const NS='http://www.w3.org/2000/svg';
+function hideTip(){ tip.style.display='none'; view.querySelectorAll('.hv').forEach(e=>e.remove()); }
+function showTip(svg,e){
+  const c=REG[+svg.dataset.cid]; if(!c) return hideTip();
+  const r=svg.getBoundingClientRect(), vx=(e.clientX-r.left)/r.width*c.w, span=c.w-c.L-c.R;
+  let i=c.mode==='line'?Math.round((vx-c.L)/span*(c.n-1)):Math.floor((vx-c.L)/(span/c.n));
+  i=Math.max(0,Math.min(c.n-1,i));
+  const gx=c.mode==='line'?c.L+i*span/Math.max(c.n-1,1):c.L+span/c.n*(i+.5);
+  svg.querySelectorAll('.hv').forEach(el=>el.remove());
+  const add=(tag,at)=>{const el=document.createElementNS(NS,tag);el.setAttribute('class','hv');for(const k in at)el.setAttribute(k,at[k]);svg.appendChild(el);return el};
+  add('line',{x1:gx,x2:gx,y1:c.T,y2:c.h-c.B,stroke:'rgba(255,255,255,.35)','stroke-dasharray':'3 3'});
+  const rows=[];
+  c.series.forEach(s=>{const v=s.vals[i]; if(v==null) return; rows.push(`<span><span><i style="background:${s.color}"></i>${s.name}</span><b style="display:inline;margin:0">${c.fmt(v)}</b></span>`);
+    if(c.mode==='line') add('circle',{cx:gx,cy:c.T+(1-v/c.max)*(c.h-c.T-c.B),r:5,fill:s.color,stroke:'#0c0e0f','stroke-width':2}); });
+  tip.innerHTML=`<b>${c.labels[i]}</b>${rows.join('')}`;
+  tip.style.display='block';
+  const px=r.left+gx/c.w*r.width, tw=tip.offsetWidth;
+  let left=px+14; if(left+tw>innerWidth-8) left=px-tw-14;
+  tip.style.left=Math.max(8,left)+'px'; tip.style.top=Math.max(8,r.top+6)+'px';
+}
+view.addEventListener('pointermove',e=>{const s=e.target.closest('svg.chart'); s?showTip(s,e):hideTip();});
+view.addEventListener('pointerdown',e=>{const s=e.target.closest('svg.chart'); s?showTip(s,e):hideTip();});
+view.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse') hideTip();});
+document.addEventListener('pointerdown',e=>{if(!e.target.closest('svg.chart')) hideTip();});
+let current=null;
+function go(k,first,force){
+  if(!pages[k]) k='overview';
+  if(k===current&&!force) return;
+  const draw=()=>{
+    current=k; REG.length=0; view.innerHTML=pages[k].html();
+    document.getElementById('title').textContent=pages[k].title;
+    nav.querySelectorAll('a').forEach(a=>{ if(a.dataset.k===k) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current'); });
+    landCards([...view.querySelectorAll('.card')]);
+  };
+  const old=[...view.querySelectorAll('.card')];
+  if(first||reduce||!window.gsap||!old.length) draw();
+  else gsap.to(old,{opacity:0,y:-10,duration:.22,ease:'power2.in',stagger:.02,onComplete:draw});
+}
+view.addEventListener('change',e=>{const pi=e.target.closest('[data-per]');if(pi){if(pi.value){per[pi.dataset.per]=isoK(pi.value);go(current,false,true)}return}
+  const s=e.target.closest('[data-cmp]');if(s){cmp[s.dataset.cmp]=s.dataset.cmp==='mode'?s.value:+s.value;go(current,false,true)}});
+view.addEventListener('click',e=>{const b=e.target.closest('[data-metric]');if(b){metric=b.dataset.metric;go(current,false,true)}const pb=e.target.closest('[data-preset]');if(pb){Object.assign(per,PRE[pb.dataset.preset]());go(current,false,true)}});
+monthSel.addEventListener('change',()=>{sel=+monthSel.value;{const r=months[sel];cmp.m=r.m;cmp.b=r.y;cmp.a=r.y-1}go(current,false,true)});
+addEventListener('hashchange',()=>go(location.hash.slice(1)));
+go(location.hash.slice(1)||'overview',true);
+}
+
+/*CONV*/
+function toData(j){
+  const num=v=>v===''||v==null?null:+v, live=s=>String(s).trim()!=='Template';
+  const days=[], byM={};
+  j.daily.forEach(([date,total,visa,cash,insta,guests,status])=>{
+    total=num(total); if(total==null||!live(status)) return;
+    const [y,m,d]=String(date).split('-').map(Number); if(!y||!m||!d) return;
+    const wd=new Date(Date.UTC(y,m-1,d)).getUTCDay()||7;            // Mon=1 ... Sun=7
+    days.push([y,m,d,wd,total,num(guests)||0]);
+    const a=byM[y*100+m]=byM[y*100+m]||{y,m,n:0,total:0,guests:0,visa:null,cash:null,insta:null};
+    a.n++; a.total+=total; a.guests+=num(guests)||0;
+    [['visa',visa],['cash',cash],['insta',insta]].forEach(([k,v])=>{v=num(v); if(v!=null) a[k]=(a[k]||0)+v});
+  });
+  days.sort((p,q)=>(p[0]-q[0])||(p[1]-q[1])||(p[2]-q[2]));
+  const mon={}; j.monthly.forEach(([y,m,total,visa,cash,insta,guests,status])=>{ if(num(total)!=null&&live(status)) mon[y*100+m]={total:+total,visa:num(visa),cash:num(cash),insta:num(insta),guests:num(guests)}});
+  const months=Object.keys(byM).map(Number).sort((p,q)=>p-q).map(k=>{
+    const a=byM[k], r=mon[k]||{}, dim=new Date(Date.UTC(a.y,a.m,0)).getUTCDate();
+    // monthly sheet wins where it has a number; otherwise rebuild from the daily rows
+    const pick=(key,alt)=>r[key]!=null?r[key]:alt;
+    return {y:a.y,m:a.m,total:pick('total',a.total),guests:pick('guests',a.guests),visa:pick('visa',a.visa)||0,cash:pick('cash',a.cash)||0,insta:pick('insta',a.insta),part:a.n<dim};
+  });
+  return {months,days};
+}
+/*/CONV*/
+(function(){
+  const URL_='https://script.google.com/macros/s/AKfycbyku-k5lXhZMJZPaLJeToR_dxp3VG13N343igem7q5Z8TPjiqs7AoAoiZhYO425eENJ/exec', K='eatery_dashboard_key';
+  const st={get(){try{return localStorage.getItem(K)}catch(e){return null}},set(v){try{localStorage.setItem(K,v)}catch(e){}},del(){try{localStorage.removeItem(K)}catch(e){}}};
+  const gate=document.getElementById('gate'), msg=document.getElementById('gmsg'), form=document.getElementById('gform'), inp=document.getElementById('gkey'), retry=document.getElementById('gretry');
+  const show=(text,{ask=false,again=false}={})=>{gate.hidden=false; msg.textContent=text; form.hidden=!ask; retry.hidden=!again; if(ask) inp.focus()};
+  async function fetchData(key){
+    const r=await fetch(URL_+'?key='+encodeURIComponent(key)); if(!r.ok) throw new Error('http '+r.status);
+    const j=await r.json(); if(j.error) return null;
+    if(!Array.isArray(j.daily)||!Array.isArray(j.monthly)) throw new Error('shape');
+    return toData(j);
+  }
+  async function start(key){
+    show('Loading your sales…');
+    try{
+      const d=await fetchData(key);
+      if(!d){ st.del(); return show('That password is not right. Try again.',{ask:true}); }
+      if(!d.months.length) return show('The sheet has no sales rows yet.',{again:true});
+      st.set(key); gate.hidden=true; boot(d);
+    }catch(e){ show('Could not reach the sheet. Check the internet and try again.',{again:true}); }
+  }
+  form.addEventListener('submit',e=>{e.preventDefault(); if(inp.value.trim()) start(inp.value.trim())});
+  retry.addEventListener('click',()=>start(st.get()||inp.value.trim()));
+  const k=st.get(); k?start(k):show('Enter the dashboard password.',{ask:true});
+})();
+
+</script>
+
+</body></html>
