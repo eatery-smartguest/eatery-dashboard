@@ -5,7 +5,7 @@ const block=n=>src.match(new RegExp('/\\*'+n+'\\*/([\\s\\S]*?)/\\*/'+n+'\\*/'))[
 const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],WK=['Sat','Sun','Mon','Tue','Wed','Thu','Fri'];
 const f=n=>Math.round(n).toLocaleString('en-US'),pct=(a,b)=>b?a/b*100:0,short=v=>String(Math.round(v)),key=(y,m)=>y*100+m;
 const mk=(months)=>{const idxOf={};months.forEach((r,i)=>idxOf[key(r.y,r.m)]=i);
-  return new Function('MN','WK','wkIdx','f','pct','short','key','idxOf','lbl',block('INS')+block('LOGIC')+';return {insights,alerts,outlook,patterns,summary}')
+  return new Function('MN','WK','wkIdx','f','pct','short','key','idxOf','lbl',block('INS')+block('LOGIC')+';return {insights,alerts,outlook,patterns,summary,yearOutlook,payChecks,topInsights}')
    (MN,WK,w=>(w+1)%7,f,pct,short,key,idxOf,r=>MN[r.m-1]+' '+r.y);};
 const wdOf=(y,m,d)=>new Date(Date.UTC(y,m-1,d)).getUTCDay()||7;
 const run=(y,m,from,to,fn)=>{const o=[];for(let d=from;d<=to;d++)o.push({y,m,d,wd:wdOf(y,m,d),...fn(d)});return o};
@@ -36,4 +36,16 @@ assert(!/NaN|undefined/.test(JSON.stringify(P)),'no NaN');
 
 // summary: readable text with the figures in it
 const t=L.summary(months,days,0,o,L.alerts(months,days)); assert(/Sales 3,100 EGP/.test(t)&&/forecast 3,000 EGP/.test(t)&&/target 4,000 EGP/.test(t),t);
+// year outlook: 2025 = 100/month; 2026 Jan-Oct = 110/month (+10%) => 1100 + 2 x 110 = 1320
+const yr=[];for(let m=1;m<=12;m++)yr.push({y:2025,m,total:100,guests:10,visa:0,cash:0,insta:null,part:false});
+for(let m=1;m<=10;m++)yr.push({y:2026,m,total:110,guests:10,visa:0,cash:0,insta:null,part:false});
+const yo=mk(yr).yearOutlook(yr); assert.strictEqual(Math.round(yo.est),1320); assert.strictEqual(Math.round(yo.growth),10);
+assert.strictEqual(mk(yr).yearOutlook(yr.slice(0,12)),null,'complete year has no outlook');
+// payment checks: only meaningful gaps, biggest first; 2024-style days without Instapay only when payments exceed the total
+const pd=[{y:2026,m:1,d:1,wd:4,total:1000,guests:1,visa:600,cash:400,insta:0},{y:2026,m:1,d:2,wd:5,total:100000,guests:1,visa:50000,cash:10000,insta:0},
+  {y:2026,m:1,d:3,wd:6,total:10000,guests:1,visa:60000,cash:0,insta:0},{y:2024,m:1,d:4,wd:4,total:9000,guests:1,visa:5000,cash:2000,insta:null}];
+assert.deepStrictEqual(L.payChecks(pd).map(x=>Math.round(x.gap)),[-50000,40000]);
+const yd=[];yr.forEach(r=>{const n=new Date(Date.UTC(r.y,r.m,0)).getUTCDate();yd.push(...run(r.y,r.m,1,n,()=>({total:r.total/n,guests:1,visa:null,cash:null,insta:null})))});
+const ti=mk(yr).topInsights(yr,yd); assert(ti.length>=3&&!/NaN|undefined/.test(JSON.stringify(ti)),JSON.stringify(ti));
+assert(/2026 is heading for about 1320 EGP/.test(ti[0][1]),ti[0][1]);
 console.log('LOGIC OK');

@@ -153,6 +153,10 @@ input[type=date]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
   body::before,aside,.hd,#tip,.gate{display:none!important}
   .app{display:block}.card{break-inside:avoid;box-shadow:none!important;backdrop-filter:none!important;border:1px solid #ccc}
 }
+.top{margin:12px 0 0;padding:0;list-style:none;counter-reset:t;display:grid;gap:8px}
+.top li{counter-increment:t;display:grid;grid-template-columns:28px 1fr;column-gap:10px;padding:10px 12px;border-radius:12px;background:var(--glass-2);border-left:3px solid var(--c)}
+.top li::before{content:counter(t);grid-row:span 2;font:700 15px var(--f-display);color:var(--c);align-self:start}
+.top b{font-weight:600}.top span{color:var(--muted);font-size:12.5px;line-height:1.5}
 </style>
 
 <div class="app">
@@ -210,7 +214,7 @@ const pct = (a,b) => b ? (a/b*100) : 0;
 const months = DATA.months;                    // {y,m,total,guests,visa,cash}
 const key = (y,m) => y*100+m;
 const idxOf = {}; months.forEach((r,i)=>idxOf[key(r.y,r.m)]=i);
-const days = DATA.days.map(([y,m,d,wd,total,guests])=>({y,m,d,wd,total,guests}));
+const days = DATA.days.map(([y,m,d,wd,total,guests,visa=null,cash=null,insta=null])=>({y,m,d,wd,total,guests,visa,cash,insta}));
 const daysOf = (y,m) => days.filter(x=>x.y===y&&x.m===m);
 const lbl = r => MN[r.m-1]+' '+r.y+(r.part?' so far':'');
 const itemised = r => r.visa+r.cash+(r.insta||0);
@@ -443,6 +447,45 @@ function summary(months,days,sel,out,al){
   al.forEach(([t,h])=>L.push((t==='bad'?'[!] ':t==='warn'?'[?] ':'[+] ')+h));
   return L.join('\n');
 }
+/* full-year estimate: months still to come = same months last year, grown by this year's ratio so far */
+function yearOutlook(months){
+  const done=months.filter(r=>!r.part); if(!done.length) return null;
+  const Y=done[done.length-1].y, cur=done.filter(r=>r.y===Y), last=Math.max(...cur.map(r=>r.m));
+  if(last>=12||cur.length!==last) return null;
+  const prev=months.filter(r=>r.y===Y-1&&!r.part), base=prev.filter(r=>r.m<=last), rest=prev.filter(r=>r.m>last);
+  if(base.length!==last||rest.length!==12-last) return null;
+  const actual=L_sum(cur,'total'), ratio=actual/L_sum(base,'total'), est=actual+L_sum(rest,'total')*ratio, prevFull=L_sum(prev,'total');
+  return {Y,last,actual,ratio,est,prevFull,growth:(est/prevFull-1)*100};
+}
+/* days whose Visa + Cash + Instapay is more than 1,000 EGP away from the total */
+function payChecks(days){
+  return days.filter(x=>x.visa!=null&&x.cash!=null).map(x=>({...x,gap:x.total-x.visa-x.cash-(x.insta||0)}))
+    .filter(x=>Math.abs(x.gap)>1000&&(x.insta!=null||x.gap<0)).sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap));
+}
+/* the few things worth knowing across all the data */
+function topInsights(months,days){
+  const out=[], P=v=>(v>=0?'+':'−')+Math.abs(v).toFixed(1)+'%', done=months.filter(r=>!r.part);
+  const yo=yearOutlook(months);
+  if(yo) out.push([yo.growth>=0?'good':'bad',`${yo.Y} is heading for about ${short(yo.est)} EGP`,
+    `${short(yo.actual)} so far (Jan to ${MN[yo.last-1]}). If ${MN[yo.last]} to Dec grow like the year so far (${P((yo.ratio-1)*100)} on ${yo.Y-1}), the year ends near ${short(yo.est)}, against ${short(yo.prevFull)} in ${yo.Y-1}.`]);
+  if(done.length){
+    const Y=done[done.length-1].y, last=done[done.length-1].m, a=done.filter(r=>r.y===Y&&r.m<=last), b=done.filter(r=>r.y===Y-1&&r.m<=last);
+    if(a.length&&b.length===a.length){
+      const ga=L_sum(a,'guests'), gb=L_sum(b,'guests'), ca=L_sum(a,'total')/ga, cb=L_sum(b,'total')/gb, dg=(ga/gb-1)*100, dc=(ca/cb-1)*100;
+      const [t,h]=dg<0&&dc>0?['warn','Sales grow on bigger checks while guests fall']:dg>=0&&dc>=0?['good','More guests and bigger checks']:dg>=0?['warn','More guests, but smaller checks']:['bad','Fewer guests and smaller checks'];
+      out.push([t,h,`${Y} so far against the same months of ${Y-1}: guests ${P(dg)}, average check ${P(dc)} (${f(cb)} to ${f(ca)} EGP).`]);
+    }
+  }
+  const yr=days.slice(-365), wk=yr.filter(x=>x.wd===5||x.wd===6);
+  if(yr.length>=60) out.push(['info',`Fri and Sat bring ${(L_sum(wk,'total')/L_sum(yr,'total')*100).toFixed(0)}% of sales`,`2 days out of 7, over the last ${yr.length} days.`]);
+  const T=patterns(months,days), L=days[days.length-1], dimL=L_dim(L.y,L.m), nm=L.d>=dimL?L.m%12+1:L.m, se=T.season.find(r=>r.m===nm);
+  if(se) out.push([se.idx>=105?'good':se.idx<=95?'warn':'info',`${MN[nm-1]} is usually ${se.idx>=105?'a strong':se.idx<=95?'a weak':'an average'} month`,`Sales per day in ${MN[nm-1]} are ${se.idx.toFixed(0)}% of an average month of the same year (${se.n} year${se.n>1?'s':''} of data).`]);
+  const R=T.ram[T.ram.length-1];
+  if(R) out.push(['info',`Ramadan ${R.y} cut daily sales by ${Math.abs((R.t/R.tb-1)*100).toFixed(0)}%`,`${f(R.t)} EGP a day against ${f(R.tb)} in the 30 days before. Guests ${P((R.g/R.gb-1)*100)}.`]);
+  const pc=payChecks(days);
+  if(pc.length) out.push(['warn',`${pc.length} day${pc.length>1?'s':''} where payments don't add up`,`Largest: ${dayLbl(pc[0])} ${pc[0].y}, Visa + Cash + Instapay is ${f(Math.abs(pc[0].gap))} EGP ${pc[0].gap<0?'above':'below'} the total. The list is on the Payments page.`]);
+  return out;
+}
 /*/LOGIC*/
 const pages = {
  overview:{title:'Overview', html(){
@@ -453,7 +496,9 @@ const pages = {
    [gp>3?'warn':'good', `${gp.toFixed(1)}% of sales not itemised`, `${f(gapOf(M))} EGP is not in Visa, Cash or Instapay`, gp>3?'Check':'OK'],
    ['warn', `Weakest day: ${dayName(worst)}`, `${f(worst.total)} EGP, ${worst.guests} guests`, 'Low']];
   const col=c=>({good:'var(--good)',bad:'var(--bad)',warn:'var(--warn)'}[c]);
+  const TI=topInsights(months,days), tc={good:'var(--good)',bad:'var(--bad)',warn:'var(--warn)',info:'var(--muted)'};
   return `
+  ${TI.length?`<div class="card glass s12"><h2>Top insights</h2><div class="sub">Across all your data, up to ${dayLbl(days[days.length-1])} ${days[days.length-1].y}</div><ol class="top">${TI.map(([t,h,x])=>`<li style="--c:${tc[t]}"><b>${h}</b><span>${x}</span></li>`).join('')}</ol></div>`:''}
   ${kpi('Sales',(M.total/1e6).toFixed(2)+'M',delta(M.total,P&&P.total),`data-count="${(M.total/1e6).toFixed(2)}" data-dec="2" data-suf="M"`)}
   ${kpi('Guests',f(M.guests),delta(M.guests,P&&P.guests),`data-count="${M.guests}"`)}
   ${kpi('Average check',f(ch)+' EGP',delta(ch,P&&P.total/P.guests),`data-count="${Math.round(ch)}" data-suf=" EGP"`)}
@@ -558,6 +603,7 @@ const pages = {
   return `
   <div class="card glass s6"><h2>Cash share</h2><div class="sub">Cash as % of sales</div>${lineChart({series:[{name:'Cash',data:months.map(r=>r.part?null:pct(r.cash,r.total)),color:'#f0b445'}],xlabels:mLabels,fmt:v=>v.toFixed(0)+'%',aria:'Cash share by month',tips:months.map(lbl),tipFmt:v=>v.toFixed(1)+'%'})}</div>
   <div class="card glass s6"><h2>Not itemised</h2><div class="sub">Sales minus Visa, Cash and Instapay, % of sales</div>${lineChart({series:[{name:'Not itemised',data:months.map(r=>r.part?null:pct(gapOf(r),r.total)),color:'#ef5b5b'}],xlabels:mLabels,fmt:v=>v.toFixed(0)+'%',aria:'Not itemised share by month',tips:months.map(lbl),tipFmt:v=>v.toFixed(1)+'%'})}</div>
+  ${(()=>{const pc=payChecks(days); return `<div class="card glass s12"><h2>Payment checks</h2><div class="sub">Days where Visa + Cash + Instapay is more than 1,000 EGP away from the total</div>${pc.length?`<div class="tablewrap"><table><thead><tr><th>Day</th><th>Total</th><th>Visa</th><th>Cash</th><th>Instapay</th><th>Difference</th></tr></thead><tbody>${pc.map(x=>`<tr><td>${dayLbl(x)} ${x.y}</td><td>${f(x.total)}</td><td>${f(x.visa)}</td><td>${f(x.cash)}</td><td>${x.insta==null?'—':f(x.insta)}</td><td style="color:${x.gap<0?'var(--bad)':'var(--warn)'}">${x.gap<0?'−':'+'}${f(Math.abs(x.gap))}</td></tr>`).join('')}</tbody></table></div><p class="note">A minus means the payments are more than the total. Round differences like 30,000 or 60,000 are often a typing slip in the daily message.</p>`:'<p class="note">Every day with a payment split adds up to its total.</p>'}</div>`})()}
   <div class="card glass s12"><h2>Instapay share</h2><div class="sub">Instapay as % of sales, from ${firstInsta}</div>${lineChart({series:[{name:'Instapay',data:months.map(r=>r.insta==null||r.part?null:pct(r.insta,r.total)),color:'#4cc38a'}],xlabels:mLabels,fmt:v=>v.toFixed(0)+'%',aria:'Instapay share by month',tips:months.map(lbl),tipFmt:v=>v.toFixed(1)+'%'})}</div>
   <div class="card glass s12"><h2>${lbl(M)} breakdown</h2><div class="sub">Total ${f(M.total)} EGP</div>${bars([['Visa',pct(M.visa,M.total),'w',f(M.visa)+' EGP · '+pct(M.visa,M.total).toFixed(1)+'%'],['Cash',pct(M.cash,M.total),'',f(M.cash)+' EGP · '+pct(M.cash,M.total).toFixed(1)+'%'],...instaBar(M,1),['Not itemised',gp,'b',f(gapOf(M))+' EGP · '+gp.toFixed(1)+'%']])}<p class="note">Instapay is recorded from ${firstInsta}. Before that it sits inside Not itemised.</p></div>`; }}
 };
@@ -710,7 +756,7 @@ function toData(j){
     total=num(total); if(total==null||!live(status)) return;
     const [y,m,d]=ymd(date); if(!y||!m||!d) return;
     const wd=new Date(Date.UTC(y,m-1,d)).getUTCDay()||7;            // Mon=1 ... Sun=7
-    days.push([y,m,d,wd,total,num(guests)||0]);
+    days.push([y,m,d,wd,total,num(guests)||0,num(visa),num(cash),num(insta)]);
     const a=byM[y*100+m]=byM[y*100+m]||{y,m,n:0,total:0,guests:0,visa:null,cash:null,insta:null};
     a.n++; a.total+=total; a.guests+=num(guests)||0;
     [['visa',visa],['cash',cash],['insta',insta]].forEach(([k,v])=>{v=num(v); if(v!=null) a[k]=(a[k]||0)+v});
