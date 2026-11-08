@@ -83,12 +83,7 @@ tr:last-child td{border-bottom:0}
   main{padding-bottom:84px}
   .s4,.s5,.s7,.s8{grid-column:span 12}.s3{grid-column:span 6}
 }
-.sndbtn{position:fixed;right:16px;bottom:16px;z-index:50;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:#fff;background:#23282b;border:1.5px solid rgba(255,255,255,.35);box-shadow:0 4px 16px rgba(0,0,0,.45);cursor:pointer;padding:0}
-.sndbtn.off{color:#9a948b;background:#17191b}
-.sndbtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-@media (max-width:700px){.sndbtn{bottom:calc(78px + env(safe-area-inset-bottom))}}
-.ripple{position:fixed;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:2px solid var(--accent);pointer-events:none;z-index:99999;will-change:transform,opacity}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}.ripple{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
 .s6{grid-column:span 6}
 @media (max-width:900px){.s6{grid-column:span 12}}
@@ -204,7 +199,6 @@ input[type=date]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 <div id="gate" class="gate" hidden><div class="glass gbox"><h2>Eatery sales</h2><p id="gmsg"></p>
 <form id="gform" hidden><label for="gkey" class="sr">Password</label><span class="pw"><input id="gkey" type="password" autocomplete="current-password" placeholder="Password"><button id="geye" type="button" class="eye" aria-label="Show password" aria-pressed="false">Show</button></span><button type="submit">Open</button></form>
 <button id="gretry" type="button" hidden>Try again</button></div></div>
-<button id="snd" type="button" class="sndbtn" aria-pressed="true" aria-label="Mute sound" title="Sound on/off (M)"></button>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script>
 function boot(DATA){
@@ -807,7 +801,6 @@ function toData(j){
       F('eform').reset(); reset(); showErr({}); F('efillmsg').textContent=''; F('emsgout').textContent=''; F('ewarn').textContent='';
       el('date').max=today; el('date').value=next<today?next:today;
       dlg.showModal(); F('emsg').focus();
-      if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&window.gsap) gsap.fromTo(dlg,{y:22,scale:.97,opacity:0},{y:0,scale:1,opacity:1,duration:.38,ease:'power3.out',clearProps:'transform,opacity'});
     });
     F('ecancel').addEventListener('click',()=>dlg.close());
     F('eform').addEventListener('input',e=>{ if(e.target.id!=='emsg'){ reset(); check(); } });
@@ -860,67 +853,6 @@ function toData(j){
   const k=st.get(); k?start(k):show('Enter the dashboard password.',{ask:true});
 })();
 
-/*PRESS*/
-(function(){
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches||!window.gsap) return;
-  const PRESS='button,a,summary,[role=tab],[role=button]';
-  const ring=(x,y,delay)=>{
-    const d=document.createElement('i'); d.className='ripple'; d.style.left=x+'px'; d.style.top=y+'px';
-    document.body.appendChild(d);
-    gsap.fromTo(d,{scale:.2,opacity:.55},{scale:5.5,opacity:0,duration:.75,delay,ease:'power2.out',onComplete:()=>d.remove()});
-  };
-  document.addEventListener('pointerdown',e=>{
-    const el=e.target.closest&&e.target.closest(PRESS);
-    if(!el||el.disabled||el.id==='geye') return;
-    ring(e.clientX,e.clientY,0); ring(e.clientX,e.clientY,.09);
-    if(!el.matches('nav a')) gsap.to(el,{scale:.95,duration:.09,ease:'power2.out',overwrite:'auto'});
-    const up=()=>{ gsap.to(el,{scale:1,duration:.5,ease:'elastic.out(1,.45)',overwrite:'auto',clearProps:'transform'}); };
-    el.addEventListener('pointerup',up,{once:true}); el.addEventListener('pointerleave',up,{once:true}); el.addEventListener('pointercancel',up,{once:true});
-  },true);
-})();
-/*/PRESS*/
-/*SOUND*/
-(function(){
-  const K='eatery_dashboard_sound', btn=document.getElementById('snd');
-  let on=true; try{ on=localStorage.getItem(K)!=='off' }catch(e){}
-  let ctx=null;
-  const AC=window.AudioContext||window.webkitAudioContext;
-  const ICON={
-    on:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"/></svg>',
-    off:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 9.5l4 5M21 9.5l-4 5"/></svg>'
-  };
-  function paint(){ if(!btn) return; btn.innerHTML=on?ICON.on:ICON.off; btn.setAttribute('aria-pressed',String(on)); btn.setAttribute('aria-label',on?'Mute sound':'Unmute sound'); btn.classList.toggle('off',!on); }
-  // a soft pulse: two quick low beats. The overtone keeps it audible on small phone speakers.
-  function beat(t,f,vol,len){
-    [[f,f*.5,'sine',vol],[f*2,f,'triangle',vol*.28]].forEach(([a,z,type,v])=>{
-      const o=ctx.createOscillator(), g=ctx.createGain();
-      o.type=type; o.frequency.setValueAtTime(a,t); o.frequency.exponentialRampToValueAtTime(z,t+len*.7);
-      g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(v,t+0.008); g.gain.exponentialRampToValueAtTime(0.0001,t+len);
-      o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+len+0.03);
-    });
-  }
-  function play(){
-    try{ const t=ctx.currentTime+0.02; beat(t,170,.45,.16); beat(t+.12,140,.28,.18); }catch(e){}
-  }
-  function pulse(){
-    if(!on||!AC) return;
-    try{
-      ctx=ctx||new AC();
-      if(ctx.state!=='running'){ ctx.resume().then(play).catch(()=>{}); return; }
-      play();
-    }catch(e){}
-  }
-  function toggle(){ on=!on; try{ localStorage.setItem(K,on?'on':'off') }catch(e){} paint(); if(on) pulse(); }
-  document.addEventListener('pointerdown',e=>{
-    const el=e.target.closest&&e.target.closest('button,a,select,summary,[role=tab],[role=button]');
-    if(!el||el.disabled||el.id==='geye'||el.id==='snd') return;
-    pulse();
-  },true);
-  if(btn) btn.addEventListener('click',toggle);
-  document.addEventListener('keydown',e=>{ if((e.key==='m'||e.key==='M')&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!/^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName||''))) toggle(); });
-  paint();
-})();
-/*/SOUND*/
 </script>
 
 </body></html>
