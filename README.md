@@ -14,3 +14,6 @@ Targets: add a `Targets` tab to the sheet with `Year, MonthNumber, Target_EGP` (
 - The Apps Script code is in `apps-script/Code.gs` (backup copy). After changing it: Deploy > Manage deployments > edit > New version.
 
 Tests: `node tests/conv.test.js`, `node tests/logic.test.js`, `node tests/entry.test.js`, `node tests/apps-script.test.js`.
+
+## Install as an app
+The page is a PWA (`manifest.webmanifest` and `icons/`). Android and laptop Chrome: menu > Install app. iPhone Safari: Share > Add to Home Screen. It still needs the internet: sales are read live from the sheet and are never stored in the app.
