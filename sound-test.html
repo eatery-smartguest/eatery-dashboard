@@ -28,7 +28,8 @@ const V={
  D(t,r){tone(t,1100*r,650*r,0.06,0.26,0.14)}
 };
 document.querySelectorAll('button').forEach(b=>b.addEventListener('pointerdown',()=>{
-  ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();ctx.resume();
-  V[b.dataset.v](ctx.currentTime,0.88+Math.random()*0.24);
+  ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
+  const go=()=>V[b.dataset.v](ctx.currentTime+0.02,0.88+Math.random()*0.24);
+  if(ctx.state==='running') go(); else ctx.resume().then(go);
 }));
 </script></main></body></html>
