@@ -83,7 +83,8 @@ tr:last-child td{border-bottom:0}
   main{padding-bottom:84px}
   .s4,.s5,.s7,.s8{grid-column:span 12}.s3{grid-column:span 6}
 }
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.ripple{position:fixed;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:2px solid var(--accent);pointer-events:none;z-index:99999;will-change:transform,opacity}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}.ripple{display:none}}
 
 .s6{grid-column:span 6}
 @media (max-width:900px){.s6{grid-column:span 12}}
@@ -801,6 +802,7 @@ function toData(j){
       F('eform').reset(); reset(); showErr({}); F('efillmsg').textContent=''; F('emsgout').textContent=''; F('ewarn').textContent='';
       el('date').max=today; el('date').value=next<today?next:today;
       dlg.showModal(); F('emsg').focus();
+      if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&window.gsap) gsap.fromTo(dlg,{y:22,scale:.97,opacity:0},{y:0,scale:1,opacity:1,duration:.38,ease:'power3.out',clearProps:'transform,opacity'});
     });
     F('ecancel').addEventListener('click',()=>dlg.close());
     F('eform').addEventListener('input',e=>{ if(e.target.id!=='emsg'){ reset(); check(); } });
@@ -853,6 +855,25 @@ function toData(j){
   const k=st.get(); k?start(k):show('Enter the dashboard password.',{ask:true});
 })();
 
+/*PRESS*/
+(function(){
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches||!window.gsap) return;
+  const PRESS='button,a,summary,[role=tab],[role=button]';
+  const ring=(x,y,delay)=>{
+    const d=document.createElement('i'); d.className='ripple'; d.style.left=x+'px'; d.style.top=y+'px';
+    document.body.appendChild(d);
+    gsap.fromTo(d,{scale:.2,opacity:.55},{scale:5.5,opacity:0,duration:.75,delay,ease:'power2.out',onComplete:()=>d.remove()});
+  };
+  document.addEventListener('pointerdown',e=>{
+    const el=e.target.closest&&e.target.closest(PRESS);
+    if(!el||el.disabled||el.id==='geye') return;
+    ring(e.clientX,e.clientY,0); ring(e.clientX,e.clientY,.09);
+    if(!el.matches('nav a')) gsap.to(el,{scale:.95,duration:.09,ease:'power2.out',overwrite:'auto'});
+    const up=()=>{ gsap.to(el,{scale:1,duration:.5,ease:'elastic.out(1,.45)',overwrite:'auto',clearProps:'transform'}); };
+    el.addEventListener('pointerup',up,{once:true}); el.addEventListener('pointerleave',up,{once:true}); el.addEventListener('pointercancel',up,{once:true});
+  },true);
+})();
+/*/PRESS*/
 /*SOUND*/
 (function(){
   const K='eatery_dashboard_sound', btn=document.getElementById('snd');
