@@ -3,11 +3,12 @@
 const SHEET_ID = '1qPpKOIFVAkeYUJ_DnMQ9FAcjLvHa7AWzLN1ma_T31Eo';
 const DAILY = ['Date','Total_EGP','Visa_EGP','Cash_EGP','Instapay_EGP','Guests','RecordStatus'];
 const MONTHLY = ['Year','MonthNumber','Total_EGP','Visa_EGP','Cash_EGP','Instapay_EGP','Guests','RecordStatus'];
+const LOG_HEAD = ['When','Date','Old_Total','Old_Visa','Old_Cash','Old_Instapay','Old_Guests','New_Total','New_Visa','New_Cash','New_Instapay','New_Guests'];
 const MAX_MONEY = 5000000, MAX_GUESTS = 5000;
 
 // Read: all sales for the dashboard.
 function doGet(e){
-  if(!authorized(e.parameter && e.parameter.key)) return out({error:'unauthorized'});
+  if(!authorized(e && e.parameter && e.parameter.key)) return out({error:'unauthorized'});
   const ss = SpreadsheetApp.openById(SHEET_ID), tz = ss.getSpreadsheetTimeZone(), t = ss.getSheetByName('Targets');
   return out({
     daily: rows(ss.getSheetByName('Daily_Data'), DAILY, tz),
@@ -46,10 +47,12 @@ function doPost(e){
     const put = (i, v) => sh.getRange(row, col[i] + 1).setValue(v === null ? '' : v);
     put(1, r.total); put(2, r.visa); put(3, r.cash); put(4, r.insta); put(5, r.guests); put(6, 'Actual');
     let log = ss.getSheetByName('Entry_Log');
-    if(!log){ log = ss.insertSheet('Entry_Log'); log.appendRow(['When','Date','Old: total | visa | cash | instapay | guests','New: total | visa | cash | instapay | guests']); }
-    const show = a => a.map(v => v === null ? '' : v).join(' | ');
-    log.appendRow([new Date(), r.date, old ? show(old) : '', show([r.total, r.visa, r.cash, r.insta, r.guests])]);
+    if(!log){ log = ss.insertSheet('Entry_Log'); log.appendRow(LOG_HEAD); }
+    const cells = a => a.map(v => v === null ? '' : v);
+    log.appendRow([new Date(), r.date].concat(old ? cells(old) : ['', '', '', '', '']).concat(cells([r.total, r.visa, r.cash, r.insta, r.guests])));
     return out({status:'saved', replaced: !!old});
+  } catch(err) {
+    return out({status:'error', message:'script error: ' + err});
   } finally {
     lock.releaseLock();
   }
