@@ -38,5 +38,5 @@ assert.deepStrictEqual(daily.v[1].slice(1),[111,'','','',11,'Actual']);
 // A date not in the sheet is added at the end
 post({key:'pw',date:'2026-11-05',total:5,guests:1}); assert.strictEqual(daily.v[3][0],'2026-11-05');
 // Every write is logged, with the old values when replacing
-const log=sheets.Entry_Log.v; assert.strictEqual(log.length,4); assert.strictEqual(log[2][2],'100 | 60 | 40 |  | 10');
+const log=sheets.Entry_Log.v; assert.strictEqual(log.length,4); assert.deepStrictEqual(log[2].slice(2,7),[100,60,40,'',10],'old values, one per column'); assert.strictEqual(log[0].length,12);
 console.log('APPS SCRIPT OK');

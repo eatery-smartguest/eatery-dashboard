@@ -168,7 +168,7 @@ input[type=date]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
   <main>
     <header>
       <div><small id="date"></small><h1 id="title">Overview</h1></div>
-      <div class="hd"><label for="month" class="pill">Month</label><select id="month"></select><button id="copy" type="button" class="hbtn">Copy summary</button><button id="print" type="button" class="hbtn">Print / PDF</button><button id="add" type="button" class="hbtn add" hidden>+ Add day</button></div>
+      <div class="hd"><label for="month" class="pill">Month</label><select id="month"></select><button id="copy" type="button" class="hbtn">Copy summary</button><button id="print" type="button" class="hbtn">Print / PDF</button><button id="snd" type="button" class="hbtn" aria-pressed="true">Sound: on</button><button id="add" type="button" class="hbtn add" hidden>+ Add day</button></div>
     </header>
     <div id="view" class="grid"></div>
   </main>
@@ -853,6 +853,35 @@ function toData(j){
   const k=st.get(); k?start(k):show('Enter the dashboard password.',{ask:true});
 })();
 
+/*SOUND*/
+(function(){
+  const K='eatery_dashboard_sound', btn=document.getElementById('snd');
+  let on=true; try{ on=localStorage.getItem(K)!=='off' }catch(e){}
+  let ctx=null;
+  const AC=window.AudioContext||window.webkitAudioContext;
+  function paint(){ if(btn){ btn.textContent='Sound: '+(on?'on':'off'); btn.setAttribute('aria-pressed',String(on)); } }
+  function drop(){
+    if(!on||!AC) return;
+    try{
+      ctx=ctx||new AC(); if(ctx.state==='suspended') ctx.resume();
+      const t=ctx.currentTime;
+      [[520,1500,0.16,0.20],[780,2100,0.05,0.12]].forEach(([f0,f1,vol,len])=>{
+        const o=ctx.createOscillator(), g=ctx.createGain();
+        o.type='sine'; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+0.08);
+        g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.012); g.gain.exponentialRampToValueAtTime(0.0001,t+len);
+        o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+len+0.03);
+      });
+    }catch(e){}
+  }
+  document.addEventListener('pointerdown',e=>{
+    const el=e.target.closest&&e.target.closest('button,a,select,summary,[role=tab],[role=button]');
+    if(!el||el.disabled||el.id==='geye') return;
+    drop();
+  },true);
+  if(btn) btn.addEventListener('click',()=>{ on=!on; try{ localStorage.setItem(K,on?'on':'off') }catch(e){} paint(); });
+  paint();
+})();
+/*/SOUND*/
 </script>
 
 </body></html>
