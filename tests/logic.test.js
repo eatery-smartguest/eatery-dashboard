@@ -5,7 +5,7 @@ const block=n=>src.match(new RegExp('/\\*'+n+'\\*/([\\s\\S]*?)/\\*/'+n+'\\*/'))[
 const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],WK=['Sat','Sun','Mon','Tue','Wed','Thu','Fri'];
 const f=n=>Math.round(n).toLocaleString('en-US'),pct=(a,b)=>b?a/b*100:0,short=v=>String(Math.round(v)),key=(y,m)=>y*100+m;
 const mk=(months)=>{const idxOf={};months.forEach((r,i)=>idxOf[key(r.y,r.m)]=i);
-  return new Function('MN','WK','wkIdx','f','pct','short','key','idxOf','lbl',block('INS')+block('LOGIC')+';return {insights,alerts,outlook,patterns,summary,yearOutlook,payChecks,topInsights}')
+  return new Function('MN','WK','wkIdx','f','pct','short','key','idxOf','lbl',block('INS')+block('LOGIC')+';return {insights,alerts,outlook,patterns,summary,yearOutlook,payChecks,topInsights,targetShare}')
    (MN,WK,w=>(w+1)%7,f,pct,short,key,idxOf,r=>MN[r.m-1]+' '+r.y);};
 const wdOf=(y,m,d)=>new Date(Date.UTC(y,m-1,d)).getUTCDay()||7;
 const run=(y,m,from,to,fn)=>{const o=[];for(let d=from;d<=to;d++)o.push({y,m,d,wd:wdOf(y,m,d),...fn(d)});return o};
@@ -48,4 +48,13 @@ assert.deepStrictEqual(L.payChecks(pd).map(x=>Math.round(x.gap)),[-50000,40000])
 const yd=[];yr.forEach(r=>{const n=new Date(Date.UTC(r.y,r.m,0)).getUTCDate();yd.push(...run(r.y,r.m,1,n,()=>({total:r.total/n,guests:1,visa:null,cash:null,insta:null})))});
 const ti=mk(yr).topInsights(yr,yd); assert(ti.length>=3&&!/NaN|undefined/.test(JSON.stringify(ti)),JSON.stringify(ti));
 assert(/2026 is heading for about 1320 EGP/.test(ti[0][1]),ti[0][1]);
+// Targets: the month, and the year up to that month (a year target is month 0)
+const tm=[{y:2026,m:1,total:100,guests:1,part:false},{y:2026,m:2,total:200,guests:1,part:false},{y:2026,m:3,total:50,guests:1,part:true}];
+const ts=mk(tm).targetShare;
+let T=ts(tm,{202603:200,202600:1000},2);
+assert.strictEqual(T.month.achieved,50);assert.strictEqual(T.month.remaining,150);assert.strictEqual(Math.round(T.month.pct),25);assert.strictEqual(T.part,true);
+assert.strictEqual(T.year.achieved,350);assert.strictEqual(T.year.remaining,650);assert.strictEqual(Math.round(T.year.pct),35);
+T=ts(tm,{202602:150},1);assert.strictEqual(T.month.over,50);assert.strictEqual(T.month.remaining,0);assert.strictEqual(T.year,null,'no year target');
+T=ts(tm,{},0);assert.strictEqual(T.month,null);assert.strictEqual(T.year,null);
+T=ts(tm,{202600:1000},1);assert.strictEqual(T.year.achieved,300,'year counts only up to the selected month');
 console.log('LOGIC OK');

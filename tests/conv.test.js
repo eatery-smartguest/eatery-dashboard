@@ -13,3 +13,6 @@ assert.strictEqual(nov.total,200,'month missing from Monthly_Data is rebuilt fro
 const iso=toData({daily:[['2024-01-01T08:00:00.000Z',5,'','','',1,'Actual'],['2023-12-31T22:00:00.000Z',7,'','','',1,'Actual']],monthly:[]});
 assert.deepStrictEqual(iso.days.map(x=>x.slice(0,3).join('-')).sort(),['2024-1-1','2024-1-1'],'ISO timestamps map to the right calendar day');
 console.log('CONV OK');
+// A Targets row with month 0 is the year target; a blank month is ignored
+const tg=toData({daily:[['2026-01-01',5,'','','',1,'Actual']],monthly:[],targets:[[2026,11,100],[2026,0,5000],[2026,'',777],[2026,13,9]]});
+assert.deepStrictEqual(tg.targets,{202611:100,202600:5000});

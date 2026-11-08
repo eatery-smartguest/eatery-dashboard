@@ -85,6 +85,8 @@ tr:last-child td{border-bottom:0}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
+.dn{display:flex;gap:22px;align-items:center;flex-wrap:wrap}.dn .list{flex:1;min-width:190px}.dn .ring b{font-size:30px}
+
 .s6{grid-column:span 6}
 @media (max-width:900px){.s6{grid-column:span 12}}
 select{font:500 13px var(--f-body);color:var(--ink);background:var(--glass-2);border:1px solid var(--edge);border-radius:99px;padding:7px 12px;cursor:pointer}
@@ -249,6 +251,15 @@ function lineChart({series,xlabels,fmt=short,w=640,h=230,aria='Line chart',tips,
 function ring(p,label){
   const r=52,c=2*Math.PI*r;
   return `<div class="ring"><svg width="140" height="140" viewBox="0 0 140 140" aria-hidden="true"><circle cx="70" cy="70" r="${r}" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="11"/><circle class="rg" cx="70" cy="70" r="${r}" fill="none" stroke="#e8642c" stroke-width="11" stroke-linecap="round" stroke-dasharray="${c*p} ${c}" transform="rotate(-90 70 70)"/></svg><b>${label}</b></div>`;
+}
+function donut(d,title,sub,hint){
+  const head=`<h2>${title}</h2><div class="sub">${sub}</div>`;
+  if(!d) return `<div class="card glass s6">${head}<p class="note">${hint}</p></div>`;
+  const r=58,c=2*Math.PI*r,share=Math.min(1,d.achieved/d.target), done=d.achieved>=d.target;
+  const svg=`<svg width="160" height="160" viewBox="0 0 160 160" role="img" aria-label="${d.pct.toFixed(0)} percent of the target"><circle cx="80" cy="80" r="${r}" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="16"/><circle class="rg" cx="80" cy="80" r="${r}" fill="none" stroke="${done?'var(--good)':'#e8642c'}" stroke-width="16" stroke-linecap="butt" stroke-dasharray="${c*share} ${c}" transform="rotate(-90 80 80)"/></svg>`;
+  const row=(k,v,col)=>`<div class="item"><span class="dot" style="background:${col}"></span><p>${k}</p><b>${f(v)}</b></div>`;
+  return `<div class="card glass s6">${head}<div class="dn"><div class="ring">${svg}<b>${d.pct.toFixed(0)}%</b></div>
+    <div class="list">${row('Achieved',d.achieved,done?'var(--good)':'#e8642c')}${done?row('Above the target',d.over,'var(--good)'):row('Remaining',d.remaining,'rgba(255,255,255,.35)')}${row('Target',d.target,'var(--muted)')}</div></div><p class="note">EGP</p></div>`;
 }
 const firstInsta=(()=>{const r=months.find(x=>x.insta!=null);return r?MN[r.m-1]+' '+r.y:'—'})();
 const instaBar=(M,full)=>M.insta==null?[]:[['Instapay',pct(M.insta,M.total),'w',(full?f(M.insta)+' EGP · ':'')+pct(M.insta,M.total).toFixed(1)+'%']];
@@ -486,6 +497,13 @@ function topInsights(months,days){
   if(pc.length) out.push(['warn',`${pc.length} day${pc.length>1?'s':''} where payments don't add up`,`Largest: ${dayLbl(pc[0])} ${pc[0].y}, Visa + Cash + Instapay is ${f(Math.abs(pc[0].gap))} EGP ${pc[0].gap<0?'above':'below'} the total. The list is on the Payments page.`]);
   return out;
 }
+// How much of a target is done: the selected month, and the year up to that month. A year target is a Targets row with month 0.
+function targetShare(months,targets,sel){
+  const M=months[sel]; if(!M) return null;
+  const one=(achieved,target)=>target>0?{achieved,target,remaining:Math.max(0,target-achieved),over:Math.max(0,achieved-target),pct:achieved/target*100}:null;
+  const yearSoFar=months.filter(r=>r.y===M.y&&r.m<=M.m).reduce((s,r)=>s+r.total,0);
+  return {y:M.y,m:M.m,part:!!M.part,month:one(M.total,targets[M.y*100+M.m]),year:one(yearSoFar,targets[M.y*100])};
+}
 /*/LOGIC*/
 const pages = {
  overview:{title:'Overview', html(){
@@ -503,6 +521,9 @@ const pages = {
   ${kpi('Guests',f(M.guests),delta(M.guests,P&&P.guests),`data-count="${M.guests}"`)}
   ${kpi('Average check',f(ch)+' EGP',delta(ch,P&&P.total/P.guests),`data-count="${Math.round(ch)}" data-suf=" EGP"`)}
   ${kpi('Best day',short(best.total),`<span class="sub">${dayName(best)}, ${best.guests} guests</span>`)}
+  ${(()=>{const T=targetShare(months,targets,sel); if(!T) return '';
+    return donut(T.month,'Month target',MN[T.m-1]+' '+T.y+(T.part?' so far':''),`No target for ${MN[T.m-1]} ${T.y} yet. In the Targets tab of the sheet add a row: ${T.y}, ${T.m}, the amount.`)
+      +donut(T.year,'Year target',T.y+', January to '+MN[T.m-1],`No target for ${T.y} yet. In the Targets tab add a row: ${T.y}, 0, the amount for the whole year.`)})()}
   ${(()=>{const c={good:'var(--good)',bad:'var(--bad)',warn:'var(--warn)',info:'var(--muted)'};return `<div class="card glass s12"><h2>Key insights</h2><div class="sub">${lbl(M)}, worked out from your data</div><div class="insg">${insights(months,days,sel).map(([t,l,h,x])=>`<div class="ins" style="border-left-color:${c[t]}"><small>${l}</small><b>${h}</b><p>${x}</p></div>`).join('')}</div></div>`})()}
   ${(()=>{const c={good:'var(--good)',bad:'var(--bad)',warn:'var(--warn)'}, al=alerts(months,days), out=outlook(months,days,targets), L=days[days.length-1];
     const A=`<div class="card glass ${out?'s6':'s12'}"><h2>Alerts</h2><div class="sub">Latest day: ${dayLbl(L)}</div><div class="list">${al.map(([t,h,x])=>`<div class="item"><span class="dot" style="background:${c[t]}"></span><p>${h}<small>${x}</small></p></div>`).join('')}</div></div>`;
@@ -769,7 +790,7 @@ function toData(j){
     const pick=(key,alt)=>r[key]!=null?r[key]:alt;
     return {y:a.y,m:a.m,total:pick('total',a.total),guests:pick('guests',a.guests),visa:pick('visa',a.visa)||0,cash:pick('cash',a.cash)||0,insta:pick('insta',a.insta),part:a.n<dim};
   });
-  const tg={}; (j.targets||[]).forEach(([y,m,t])=>{t=num(t); if(t!=null&&+y&&+m) tg[+y*100+ +m]=t});
+  const tg={}; (j.targets||[]).forEach(([y,m,t])=>{t=num(t); const mm=(m===''||m==null)?NaN:+m; if(t!=null&&+y&&Number.isInteger(mm)&&mm>=0&&mm<=12) tg[+y*100+mm]=t});
   return {months,days,targets:tg};
 }
 /*/CONV*/
