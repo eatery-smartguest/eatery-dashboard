@@ -83,6 +83,10 @@ tr:last-child td{border-bottom:0}
   main{padding-bottom:84px}
   .s4,.s5,.s7,.s8{grid-column:span 12}.s3{grid-column:span 6}
 }
+.sndbtn{position:fixed;right:16px;bottom:16px;z-index:50;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--ink);background:var(--glass-2);border:1px solid var(--edge);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);cursor:pointer;padding:0}
+.sndbtn.off{color:var(--muted)}
+.sndbtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+@media (max-width:700px){.sndbtn{bottom:calc(78px + env(safe-area-inset-bottom))}}
 .ripple{position:fixed;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:2px solid var(--accent);pointer-events:none;z-index:99999;will-change:transform,opacity}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}.ripple{display:none}}
 
@@ -169,7 +173,7 @@ input[type=date]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
   <main>
     <header>
       <div><small id="date"></small><h1 id="title">Overview</h1></div>
-      <div class="hd"><label for="month" class="pill">Month</label><select id="month"></select><button id="copy" type="button" class="hbtn">Copy summary</button><button id="print" type="button" class="hbtn">Print / PDF</button><button id="snd" type="button" class="hbtn" aria-pressed="true">Sound: on</button><button id="add" type="button" class="hbtn add" hidden>+ Add day</button></div>
+      <div class="hd"><label for="month" class="pill">Month</label><select id="month"></select><button id="copy" type="button" class="hbtn">Copy summary</button><button id="print" type="button" class="hbtn">Print / PDF</button><button id="add" type="button" class="hbtn add" hidden>+ Add day</button></div>
     </header>
     <div id="view" class="grid"></div>
   </main>
@@ -200,6 +204,7 @@ input[type=date]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 <div id="gate" class="gate" hidden><div class="glass gbox"><h2>Eatery sales</h2><p id="gmsg"></p>
 <form id="gform" hidden><label for="gkey" class="sr">Password</label><span class="pw"><input id="gkey" type="password" autocomplete="current-password" placeholder="Password"><button id="geye" type="button" class="eye" aria-label="Show password" aria-pressed="false">Show</button></span><button type="submit">Open</button></form>
 <button id="gretry" type="button" hidden>Try again</button></div></div>
+<button id="snd" type="button" class="sndbtn" aria-pressed="true" aria-label="Mute sound" title="Sound on/off (M)"></button>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script>
 function boot(DATA){
@@ -880,8 +885,24 @@ function toData(j){
   let on=true; try{ on=localStorage.getItem(K)!=='off' }catch(e){}
   let ctx=null;
   const AC=window.AudioContext||window.webkitAudioContext;
-  function paint(){ if(btn){ btn.textContent='Sound: '+(on?'on':'off'); btn.setAttribute('aria-pressed',String(on)); } }
-  function drop(){
+  const ICON={
+    on:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 9a4 4 0 0 1 0 6M19 6.5a8 8 0 0 1 0 11"/></svg>',
+    off:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 9.5l4 5M21 9.5l-4 5"/></svg>'
+  };
+  function paint(){ if(!btn) return; btn.innerHTML=on?ICON.on:ICON.off; btn.setAttribute('aria-pressed',String(on)); btn.setAttribute('aria-label',on?'Mute sound':'Unmute sound'); btn.classList.toggle('off',!on); }
+  // a soft pulse: two quick low beats. The overtone keeps it audible on small phone speakers.
+  function beat(t,f,vol,len){
+    [[f,f*.5,'sine',vol],[f*2,f,'triangle',vol*.28]].forEach(([a,z,type,v])=>{
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type=type; o.frequency.setValueAtTime(a,t); o.frequency.exponentialRampToValueAtTime(z,t+len*.7);
+      g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(v,t+0.008); g.gain.exponentialRampToValueAtTime(0.0001,t+len);
+      o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+len+0.03);
+    });
+  }
+  function play(){
+    try{ const t=ctx.currentTime+0.02; beat(t,170,.45,.16); beat(t+.12,140,.28,.18); }catch(e){}
+  }
+  function pulse(){
     if(!on||!AC) return;
     try{
       ctx=ctx||new AC();
@@ -889,23 +910,14 @@ function toData(j){
       play();
     }catch(e){}
   }
-  function play(){
-    try{
-      const t=ctx.currentTime+0.02;
-      [[520,1500,0.16,0.20],[780,2100,0.05,0.12]].forEach(([f0,f1,vol,len])=>{
-        const o=ctx.createOscillator(), g=ctx.createGain();
-        o.type='sine'; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+0.08);
-        g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.012); g.gain.exponentialRampToValueAtTime(0.0001,t+len);
-        o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+len+0.03);
-      });
-    }catch(e){}
-  }
+  function toggle(){ on=!on; try{ localStorage.setItem(K,on?'on':'off') }catch(e){} paint(); if(on) pulse(); }
   document.addEventListener('pointerdown',e=>{
     const el=e.target.closest&&e.target.closest('button,a,select,summary,[role=tab],[role=button]');
-    if(!el||el.disabled||el.id==='geye') return;
-    drop();
+    if(!el||el.disabled||el.id==='geye'||el.id==='snd') return;
+    pulse();
   },true);
-  if(btn) btn.addEventListener('click',()=>{ on=!on; try{ localStorage.setItem(K,on?'on':'off') }catch(e){} paint(); });
+  if(btn) btn.addEventListener('click',toggle);
+  document.addEventListener('keydown',e=>{ if((e.key==='m'||e.key==='M')&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!/^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName||''))) toggle(); });
   paint();
 })();
 /*/SOUND*/
